@@ -1,0 +1,38 @@
+name: capstone_app
+description: Barangay Community Services Management System
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.12.0
+  flutter_quill: ^11.5.0
+  image_picker: ^1.0.7
+  crop_your_image: ^2.0.0
+  geolocator: ^14.0.2
+  path: ^1.9.0
+  mime: ^2.0.0
+  flutter_map: ^8.3.0
+  flutter_svg: ^2.0.10+1
+  latlong2: ^0.9.1
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+    - lib/assets/
