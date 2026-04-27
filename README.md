@@ -287,7 +287,7 @@ LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 
 ## About This Project
 
-This is a **Capstone/Thesis Project** developed for academic purposes as part of a Computer Science curriculum. The BBBSCSMS system demonstrates practical application of mobile development, database design, and real-time communication technologies.
+This is a **Capstone/Thesis Project** developed for academic purposes as part of a Bachelor of Science in Information Technology (BSIT) curriculum. The BBBSCSMS system demonstrates practical application of mobile development, database design, and real-time communication technologies.
 
 ## Future Enhancements
 
