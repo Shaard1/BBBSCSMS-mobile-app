@@ -1,10 +1,12 @@
 # BBBSCSMS Mobile App
 
+**Capstone/Thesis Project**
+
 A comprehensive **Barangay Community Management System** mobile application for residents. This app enables community members to report issues, request documents, track their applications, view announcements, and engage with their barangay officials.
 
-## Overview
+## Project Overview
 
-BBBSCSMS Mobile App is the resident-facing mobile interface for the Barangay Community Management System. It empowers residents to:
+BBBSCSMS Mobile App is a capstone project developed as a resident-facing mobile interface for the Barangay Community Management System. It empowers residents to:
 - Report community issues with detailed descriptions and photos
 - Request official barangay documents
 - Track the status of their requests and reports
@@ -79,7 +81,6 @@ BBBSCSMS Mobile App is the resident-facing mobile interface for the Barangay Com
 - **Backend**: Supabase Realtime
 - **Authentication**: Supabase Auth (Phone-based OTP)
 - **Location Services**: [Geolocator](https://pub.dev/packages/geolocator)
-- **Maps**: [Google Maps Flutter](https://pub.dev/packages/google_maps_flutter)
 - **UI Library**: Material Design 3
 - **Image Handling**: [Image Picker](https://pub.dev/packages/image_picker)
 - **State Management**: Provider / GetX
@@ -156,10 +157,6 @@ lib/
    );
    ```
 
-4. **Configure Google Maps**
-   - Get your Google Maps API key
-   - Add to Android and iOS manifest files
-   - Enable Maps and Location Services APIs
 
 5. **Run the application**
    ```bash
@@ -212,8 +209,6 @@ The mobile app integrates with:
 - **Supabase Authentication** - Phone-based OTP login
 - **Supabase Realtime Database** - Real-time data updates
 - **Supabase Storage** - Photo/video storage
-- **Google Maps API** - Map functionality and geolocation
-- **Firebase Cloud Messaging** - Push notifications
 
 ## Building for Production
 
@@ -246,7 +241,6 @@ Create a `.env` file in the project root:
 ```env
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
-GOOGLE_MAPS_API_KEY=your_maps_api_key
 LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 ```
 
@@ -271,11 +265,6 @@ LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 - Verify GPS is enabled on device
 - Check Geolocator configuration
 
-### Map Not Displaying
-- Verify Google Maps API key
-- Check API is enabled in Google Cloud Console
-- Ensure proper manifest configuration
-
 ### Supabase Connection Issues
 - Verify internet connectivity
 - Check Supabase credentials
@@ -287,14 +276,6 @@ LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 - Check Flutter version: `flutter --version`
 - Run `flutter doctor` for issues
 
-## Performance Optimization
-
-- Lazy loading of images
-- Efficient database queries
-- Image compression before upload
-- Caching of announcement data
-- Optimized location tracking
-
 ## Security Features
 
 - Secure OTP-based authentication
@@ -304,61 +285,22 @@ LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 - Rate limiting on requests
 - Secure image storage
 
-## Contributing
+## About This Project
 
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+This is a **Capstone/Thesis Project** developed for academic purposes as part of a Computer Science curriculum. The BBBSCSMS system demonstrates practical application of mobile development, database design, and real-time communication technologies.
 
-## Bug Reports & Feature Requests
-
-- [Report a Bug](https://github.com/Shard1/BBBSCSMS-mobile-app/issues/new?template=bug_report.md)
-- [Request a Feature](https://github.com/Shard1/BBBSCSMS-mobile-app/issues/new?template=feature_request.md)
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Privacy & Terms
-
-- Privacy Policy
-- Terms of Service
-- Data Protection Policy
-
-## Contact & Support
-
-For support and inquiries:
-- Create an issue on GitHub
-- Email: support@barangaycsms.com
-- Visit our website: [www.barangaycsms.com](https://www.barangaycsms.com)
-
-## Roadmap
+## Future Enhancements
 
 - [ ] Offline-first capabilities
-- [ ] Social features (community chat)
-- [ ] Advanced report filtering and search
-- [ ] Complaint escalation workflow
-- [ ] Petition/voting system
+- [ ] Enhanced report filtering and search
 - [ ] Multi-language support (Tagalog, English)
 - [ ] Dark mode theme
 - [ ] Accessibility improvements
-- [ ] Integration with SMS notifications
-- [ ] Analytics dashboard for residents
-
-## Acknowledgments
-
-- Flutter community
-- Supabase for backend infrastructure
-- Google Maps API
-- All beta testers and users
-- The barangay officials and community members
+- [ ] SMS notifications
 
 ---
 
 **Version**: 1.0.0  
 **Last Updated**: April 2026  
-**Status**: Active Development  
+**Project Type**: Capstone/Thesis  
 **Supported Languages**: English, Tagalog
