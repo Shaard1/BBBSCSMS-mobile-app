@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../widgets/top_toast.dart';
+
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -21,6 +23,11 @@ class _ReportScreenState extends State<ReportScreen> {
 
   File? selectedImage;
   bool isLoading = false;
+
+  void _showTopToast(String message) {
+    if (!mounted) return;
+    TopToast.show(context, message);
+  }
 
   /* ---------------- IMAGE PICKER ---------------- */
 
@@ -61,9 +68,7 @@ class _ReportScreenState extends State<ReportScreen> {
     /* ---------------- VALIDATION ---------------- */
 
     if (descriptionController.text.isEmpty || selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please add description and image")),
-      );
+      _showTopToast("Please add description and image");
       return;
     }
 
@@ -101,15 +106,11 @@ class _ReportScreenState extends State<ReportScreen> {
 
       /* ---------------- SUCCESS MESSAGE ---------------- */
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Report submitted successfully!")),
-      );
+      _showTopToast("Report submitted successfully!");
     } catch (e) {
       setState(() => isLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      _showTopToast("Error: $e");
     }
   }
 

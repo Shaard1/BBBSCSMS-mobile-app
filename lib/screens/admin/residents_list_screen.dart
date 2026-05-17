@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../widgets/top_toast.dart';
 import 'add_resident_screen.dart';
 
 class ResidentsListScreen extends StatefulWidget {
@@ -15,6 +17,11 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
   List<Map<String, dynamic>> residents = [];
   bool isLoading = true;
   String? userRole;
+
+  void _showTopToast(String message) {
+    if (!mounted) return;
+    TopToast.show(context, message);
+  }
 
   @override
   void initState() {
@@ -71,9 +78,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       if (!mounted) return;
 
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading residents: $e')));
+      _showTopToast('Error loading residents: $e');
     }
   }
 
@@ -90,9 +95,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      _showTopToast('Delete failed: $e');
     }
   }
 
@@ -101,9 +104,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
   Future<void> updateStatus(String id, String newStatus) async {
     if (userRole != 'admin') {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can approve/reject')),
-      );
+      _showTopToast('Only admins can approve/reject');
       return;
     }
 
@@ -122,9 +123,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Permission denied or error: $e')));
+      _showTopToast('Permission denied or error: $e');
     }
   }
 

@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import '../../widgets/top_toast.dart';
+
 class ReportLocationPickerScreen extends StatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
@@ -207,9 +209,7 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    TopToast.show(context, message);
   }
 
   @override

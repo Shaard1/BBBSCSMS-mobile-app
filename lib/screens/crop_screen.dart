@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:path/path.dart' as path;
+
+import '../widgets/top_toast.dart';
 
 class CropScreen extends StatefulWidget {
   final Uint8List imageBytes;
@@ -46,20 +49,13 @@ class _CropScreenState extends State<CropScreen> {
 
         Navigator.pop(context, croppedFile);
       } else {
-        // Handle failure
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Failed to crop image. Please try again.")),
-        );
+        TopToast.show(context, "Failed to crop image. Please try again.");
       }
     } catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Failed to crop image. Please try again.")),
-      );
+      TopToast.show(context, "Failed to crop image. Please try again.");
       setState(() {
         _isCropping = false;
       });
@@ -77,6 +73,7 @@ class _CropScreenState extends State<CropScreen> {
               image: widget.imageBytes,
               controller: controller,
               aspectRatio: 1,
+              withCircleUi: true,
               onCropped: _saveCroppedImage,
             ),
           ),

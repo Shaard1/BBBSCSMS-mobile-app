@@ -134,7 +134,7 @@ class MyApp extends StatelessWidget {
       ],
 
       /// App starts at intro screen
-      initialRoute: '/intro',
+      initialRoute: '/login',
 
       routes: {
         '/intro': (context) => const AppIntroScreen(),

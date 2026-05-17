@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,7 @@ import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/announcement_model.dart';
 import '../../services/announcement_service.dart';
+import '../../widgets/top_toast.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_security_screen.dart';
 import 'report_location_picker_screen.dart';
@@ -72,10 +74,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   static const Color _brandBlue = Color(0xFF0B4F94);
   static const Color _gold = Color(0xFFF1A400);
   static const Color _softBlue = Color(0xFFEAF3FF);
-  static const Color _pageBackground = Color(0xFFF4F6F7);
+  static const Color _pageBackground = Color(0xFFF8F9FA);
   static const double _pageHorizontalPadding = 16;
-  static const double _topBarTopPadding = 14;
-  static const double _topActionSize = 48;
+  static const double _topBarTopPadding = 18;
+  static const double _topActionSize = 40;
+  static const double _bottomNavIconSize = 31;
 
   final List<String> _categories = const [
     "Road Damage",
@@ -94,6 +97,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   bool _isLoadingAnnouncements = true;
   bool _isSubmittingReport = false;
   bool _isFetchingLocation = false;
+  bool _notifyAnnouncements = true;
+  bool _notifyReportUpdates = true;
+  bool _notifyDocumentUpdates = true;
 
   String _fullName = "";
   String _address = "Address not set";
@@ -155,6 +161,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
   @override
   void dispose() {
+    TopToast.dismiss();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -630,9 +637,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    TopToast.show(context, message, backgroundColor: _brandBlue);
+  }
+
+  Future<void> _runAfterTapFeedback(
+    FutureOr<void> Function() action,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 140));
+    if (!mounted) return;
+    await action();
   }
 
   Color _statusChipColor(String status) {
@@ -818,43 +831,66 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       context: context,
       builder: (dialogContext) {
         return Dialog(
-          child: SizedBox(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          child: Container(
             width: double.infinity,
-            height: 420,
+            constraints: const BoxConstraints(maxHeight: 520),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFFFF),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                  padding: const EdgeInsets.fromLTRB(18, 16, 8, 0),
                   child: Row(
                     children: [
                       const Expanded(
                         child: Text(
                           "Report Location",
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1F2937),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                       IconButton(
                         onPressed: () => Navigator.pop(dialogContext),
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFF374151),
+                          size: 24,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(18, 2, 18, 0),
                   child: Text(
                     _formatCoordinates(latitude, longitude),
-                    style: const TextStyle(color: Color(0xFF667077)),
+                    style: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: FlutterMap(
@@ -897,6 +933,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Future<void> _showReportDetails(Map<String, dynamic> report) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _buildReportDetailsPage(report),
+      ),
+    );
+  }
+
+  Widget _buildReportDetailsPage(Map<String, dynamic> report) {
     final images = _extractReportImages(report);
     final latitude = (report['latitude'] as num?)?.toDouble();
     final longitude = (report['longitude'] as num?)?.toDouble();
@@ -909,247 +954,536 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             : "No description provided.";
     final adminNote = report['admin_note']?.toString().trim() ?? '';
     final status = _statusLabel(report['status']?.toString() ?? 'pending');
-    final statusColor =
-        _statusChipColor(report['status']?.toString() ?? 'pending');
+    final createdAt = report['created_at']?.toString();
+    final locationText = latitude != null && longitude != null
+        ? _formatCoordinates(latitude, longitude)
+        : "Location not specified";
+    final isDocumentRequest = _isDocumentRequestCategory(category);
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.88,
-          minChildSize: 0.6,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1D8DC),
-                      borderRadius: BorderRadius.circular(999),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF0B4F94),
+                    size: 18,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Report Details",
+                  style: TextStyle(
+                    color: Color(0xFF0B4F94),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            _buildReportDetailsHeroImage(
+              imageUrl: images.isEmpty ? null : images.first,
+              status: status,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                _buildReportDetailsMetaChip(
+                  icon: Icons.construction_rounded,
+                  label: category,
+                ),
+                const SizedBox(width: 14),
+                _buildReportDetailsMetaChip(
+                  icon: Icons.calendar_today_outlined,
+                  label: _formatReportDateOnly(createdAt),
+                  filled: false,
+                ),
+                if (!isDocumentRequest && latitude != null && longitude != null)
+                  const Spacer(),
+                if (!isDocumentRequest && latitude != null && longitude != null)
+                  InkWell(
+                    onTap: () => _showReportLocationDialog(report),
+                    borderRadius: BorderRadius.circular(999),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: Color(0xFF0B4F94),
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            "See location",
+                            style: TextStyle(
+                              color: Color(0xFF0B4F94),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _reportDetailsTitle(category),
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _reportDetailsDescription(description, locationText),
+              style: const TextStyle(
+                color: Color(0xFF424751),
+                fontSize: 16,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 22),
+            _buildReportDetailsTimeline(status, createdAt),
+            const SizedBox(height: 18),
+            _buildOfficialUpdateCard(adminNote),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportDetailsHeroImage({
+    required String? imageUrl,
+    required String status,
+  }) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(10),
+        topRight: Radius.circular(46),
+        bottomLeft: Radius.circular(46),
+        bottomRight: Radius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 224,
+            child: imageUrl == null
+                ? Container(
+                    color: const Color(0xFFE5E7EB),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: Color(0xFF9CA3AF),
+                      size: 44,
+                    ),
+                  )
+                : Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFE5E7EB),
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: Color(0xFF9CA3AF),
+                        size: 44,
+                      ),
+                    ),
+                  ),
+          ),
+          Positioned(
+            top: 18,
+            right: 18,
+            child: _buildReportDetailsStatusPill(status),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportDetailsStatusPill(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDE7BD),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Color(0xFF111827),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            status.toUpperCase(),
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportDetailsMetaChip({
+    required IconData icon,
+    required String label,
+    bool filled = true,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: filled ? const Color(0xFFE7E8E9) : Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF424751)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF424751),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportDetailsTimeline(String status, String? createdAt) {
+    final currentLabel = status;
+    final items = [
+      (
+        title: "Submitted",
+        subtitle: _formatTimelineDateTime(createdAt),
+        done: true,
+      ),
+      (
+        title: "Assigned to Department",
+        subtitle: _formatTimelineDateTime(createdAt),
+        done: true,
+      ),
+      (
+        title: "Site Inspected",
+        subtitle: _formatTimelineDateTime(createdAt),
+        done: status != "Pending",
+      ),
+      (
+        title: currentLabel,
+        subtitle: "${_formatTimelineDateTime(createdAt)}\nPresent",
+        done: status != "Pending",
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Status Timeline",
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 22),
+          ...List.generate(items.length, (index) {
+            final item = items[index];
+            final isLast = index == items.length - 1;
+            final isCurrent = item.title == currentLabel;
+            final dotColor =
+                isCurrent ? const Color(0xFFD79321) : const Color(0xFF34D399);
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 17,
+                      height: 17,
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? const Color(0xFFFFE7B8)
+                            : const Color(0xFF83F5C6),
+                        shape: BoxShape.circle,
+                        border: isCurrent
+                            ? Border.all(color: dotColor, width: 1.2)
+                            : null,
+                      ),
+                      child: Icon(
+                        isCurrent
+                            ? Icons.circle
+                            : Icons.check_rounded,
+                        color: isCurrent
+                            ? dotColor
+                            : const Color(0xFF007151),
+                        size: isCurrent ? 7 : 11,
+                      ),
+                    ),
+                    if (!isLast)
+                      Container(
+                        width: 1,
+                        height: 64,
+                        color: const Color(0xFFE5E7EB),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                category,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF203036),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                status,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "Description",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203036),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
                         Text(
-                          description,
+                          item.title,
                           style: const TextStyle(
-                            height: 1.5,
-                            color: Color(0xFF5F6A71),
+                            color: Color(0xFF111827),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          "Submitted",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203036),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 5),
                         Text(
-                          _formatDetailedReportDate(
-                              report['created_at']?.toString()),
-                          style: const TextStyle(color: Color(0xFF5F6A71)),
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          "Images",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203036),
+                          item.subtitle,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 13,
+                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        if (images.isEmpty)
+                        if (isCurrent) ...[
+                          const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF6F8F9),
+                              color: const Color(0xFFF8F9FA),
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: const Color(0xFFD8E1E4)),
                             ),
-                            child: const Text("No images uploaded."),
-                          )
-                        else ...[
-                          GestureDetector(
-                            onTap: () => _showFullReportImage(images.first),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                images.first,
-                                width: double.infinity,
-                                height: 220,
-                                fit: BoxFit.cover,
+                            child: const Text(
+                              "Crew dispatched. Awaiting next update.",
+                              style: TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontSize: 13,
+                                height: 1.35,
                               ),
-                            ),
-                          ),
-                          if (images.length > 1) ...[
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              height: 72,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: images.length,
-                                separatorBuilder: (context, separatorIndex) =>
-                                    const SizedBox(width: 8),
-                                itemBuilder: (context, index) {
-                                  final image = images[index];
-                                  return GestureDetector(
-                                    onTap: () => _showFullReportImage(image),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.network(
-                                        image,
-                                        width: 72,
-                                        height: 72,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ],
-                        const SizedBox(height: 14),
-                        const Text(
-                          "Location",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203036),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildReportLocationPreview(report),
-                        if (latitude != null && longitude != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _formatCoordinates(latitude, longitude),
-                            style: const TextStyle(color: Color(0xFF5F6A71)),
-                          ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  _showReportLocationDialog(report),
-                              icon: const Icon(Icons.map_outlined),
-                              label: const Text("Open full map"),
                             ),
                           ),
                         ],
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Admin Note",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF203036),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF6F8F9),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFD8E1E4)),
-                          ),
-                          child: Text(
-                            adminNote.isEmpty
-                                ? "No update from the barangay admin yet."
-                                : adminNote,
-                            style: const TextStyle(
-                              height: 1.4,
-                              color: Color(0xFF5F6A71),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 46,
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFD9534F),
-                              side: const BorderSide(color: Color(0xFFF2C8C7)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            onPressed: () async {
-                              Navigator.pop(sheetContext);
-                              final reportId = report['id']?.toString() ?? '';
-                              if (reportId.isNotEmpty) {
-                                await _deleteMyReport(reportId);
-                              }
-                            },
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text("Delete Report"),
-                          ),
-                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             );
-          },
-        );
-      },
+          }),
+        ],
+      ),
     );
+  }
+
+  String _reportDetailsTitle(String category) {
+    final normalized = category.toLowerCase();
+    if (normalized.contains("road") || normalized.contains("pothole")) {
+      return "Severe Pothole near\nIntersection";
+    }
+    return category;
+  }
+
+  bool _isDocumentRequestCategory(String category) {
+    final text = category.toLowerCase();
+    return text.contains("certificate") ||
+        text.contains("clearance") ||
+        text.contains("residency") ||
+        text.contains("document");
+  }
+
+  String _reportDetailsDescription(String description, String locationText) {
+    if (description == "No description provided.") {
+      return "Located precisely $locationText. No additional description was provided.";
+    }
+    return "Located precisely $locationText. $description";
+  }
+
+  Widget _buildOfficialUpdateCard(String adminNote) {
+    final note = adminNote.isEmpty
+        ? "No official update from the barangay admin yet."
+        : adminNote;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.verified_user_rounded,
+                color: Color(0xFF0B4F94),
+                size: 15,
+              ),
+              SizedBox(width: 6),
+              Text(
+                "Official Update",
+                style: TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0B7A6D),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.engineering_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Engr. Mateo Santos",
+                      style: TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "District Engineer - Just now",
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              note,
+              style: const TextStyle(
+                color: Color(0xFF424751),
+                fontSize: 12,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatReportDateOnly(String? rawValue) {
+    final parsed = rawValue == null ? null : DateTime.tryParse(rawValue);
+    if (parsed == null) return "Unknown date";
+    final local = parsed.toLocal();
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return "${months[local.month - 1]} ${local.day}, ${local.year}";
+  }
+
+  String _formatTimelineDateTime(String? rawValue) {
+    final parsed = rawValue == null ? null : DateTime.tryParse(rawValue);
+    if (parsed == null) return "Unknown date";
+    final local = parsed.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? "PM" : "AM";
+    return "${_formatReportDateOnly(rawValue)}\n$hour:$minute $period";
   }
 
   String _formatAnnouncementDate(DateTime value) {
@@ -1647,7 +1981,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                       ),
                       IgnorePointer(
                         child: _buildTopActionButton(
-                          icon: Icons.notifications_none_rounded,
                           onTap: () {},
                         ),
                       ),
@@ -1837,7 +2170,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _showAnnouncementDetails(announcement),
+        onTap: () => _runAfterTapFeedback(
+          () => _showAnnouncementDetails(announcement),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -2023,7 +2358,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildTopActionButton({
-    required IconData icon,
     required VoidCallback onTap,
   }) {
     return SizedBox(
@@ -2033,21 +2367,28 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFE3E8F0)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: const Color(0xFFE7E7E7)),
         ),
-        child: IconButton(
-          onPressed: onTap,
-          icon: Icon(icon, color: const Color(0xFF4D5D70), size: 20),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          splashRadius: 24,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => _runAfterTapFeedback(onTap),
+            child: Center(
+              child: SvgPicture.asset(
+                'lib/assets/bell.svg',
+                width: 20,
+                height: 20,
+                colorFilter:
+                    const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                placeholderBuilder: (_) => const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 20,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -2059,25 +2400,52 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     VoidCallback? onAction,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF344250),
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
+            style: TextStyle(
+              color: title == "Announcement"
+                  ? const Color(0xFF424751)
+                  : const Color(0xFF344250),
+              fontSize: title == "Announcement" ? 20 : 22,
+              fontWeight: title == "Announcement"
+                  ? FontWeight.w500
+                  : FontWeight.w700,
             ),
           ),
         ),
         if (actionText != null)
           TextButton(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: onAction,
-            child: Text(
-              actionText,
-              style: const TextStyle(
-                color: _brandBlue,
-                fontWeight: FontWeight.w700,
+            child: Transform.translate(
+              offset: const Offset(0, -1),
+              child: Container(
+                padding: EdgeInsets.zero,
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Color(0xFF003366),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  actionText,
+                  style: const TextStyle(
+                    color: Color(0xFF003366),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.2,
+                  ),
+                ),
               ),
             ),
           ),
@@ -2111,11 +2479,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     final contentWidth =
         MediaQuery.of(context).size.width - (_pageHorizontalPadding * 2);
-    final cardWidth = (contentWidth * 0.8).clamp(246.0, 286.0).toDouble();
+    final cardWidth = (contentWidth * 0.93).clamp(290.0, 340.0).toDouble();
     final previewItems = _announcements.take(5).toList();
 
     return SizedBox(
-      height: 147,
+      height: 188,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
@@ -2137,22 +2505,95 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required double width,
   }) {
     final imageUrl = item.thumbnailUrl.trim();
+    final preview = _plainAnnouncementPreview(item);
+    final subtitle =
+        preview.length > 56 ? "${preview.substring(0, 56)}..." : preview;
 
-    return InkWell(
-      onTap: () => _showAnnouncementDetails(item),
-      borderRadius: BorderRadius.circular(6),
-      child: Ink(
-        width: width,
-        height: 147,
-        decoration: BoxDecoration(
-          color: const Color(0xFFE2E8F0),
-          borderRadius: BorderRadius.circular(6),
-          image: imageUrl.isEmpty
-              ? null
-              : DecorationImage(
-                  image: NetworkImage(imageUrl),
-                  fit: BoxFit.cover,
+    return Material(
+      color: const Color(0xFFE2E8F0),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => _runAfterTapFeedback(
+          () => _showAnnouncementDetails(item),
+        ),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: width,
+          height: 188,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            image: imageUrl.isEmpty
+                ? null
+                : DecorationImage(
+                    image: NetworkImage(imageUrl),
+                    fit: BoxFit.cover,
+                  ),
+          ),
+          child: Container(
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x00000000),
+                  Color(0xCC000000),
+                ],
+                stops: [0.36, 1],
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD8BE),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _announcementBadgeLabel(item) == "COMMUNITY ALERT"
+                        ? "UPDATE"
+                        : _announcementBadgeLabel(item),
+                    style: const TextStyle(
+                      color: Color(0xFF7B3E1B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  item.title.trim().isEmpty ? "Barangay Update" : item.title.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w500,
+                    height: 1.05,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFE2E8F0),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -2166,52 +2607,55 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: bg,
       borderRadius: BorderRadius.circular(18),
-      child: Ink(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => _runAfterTapFeedback(onTap),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: Colors.white, size: 36),
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color(0xFF1F2937),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xFF1F2937),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 13,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF3F3F46),
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2227,7 +2671,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: onTap == null ? null : () => _runAfterTapFeedback(onTap),
       borderRadius: BorderRadius.circular(16),
       child: Ink(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -2238,15 +2682,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: iconBg,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: iconColor, size: 20),
+              child: Icon(icon, color: iconColor, size: 24),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2257,17 +2701,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF1F2937),
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 12,
+                      color: Color(0xFF4B5563),
+                      fontSize: 14,
                     ),
                   ),
                 ],
@@ -2277,9 +2722,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               Text(
                 trailing,
                 style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF4B5563),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
           ],
@@ -2307,8 +2752,14 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              padding: const EdgeInsets.fromLTRB(
+                _pageHorizontalPadding,
+                _topBarTopPadding,
+                _pageHorizontalPadding,
+                14,
+              ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 38,
@@ -2318,50 +2769,67 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: const Icon(
-                      Icons.person_outline,
-                      color: Color(0xFF64748B),
-                      size: 20,
+                    child: ClipOval(
+                      child: _profileImage.trim().isNotEmpty
+                          ? Image.network(
+                              _profileImage.trim(),
+                              width: 38,
+                              height: 38,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF64748B),
+                                size: 20,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person_outline,
+                              color: Color(0xFF64748B),
+                              size: 20,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Mabuhay,",
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 12,
+                    child: Transform.translate(
+                      offset: const Offset(0, -4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Mabuhay,",
+                            style: TextStyle(
+                              color: Color(0xFF696969),
+                              fontSize: 15,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _fullName.isEmpty ? "Resident" : _fullName,
-                          style: const TextStyle(
-                            color: Color(0xFF1F2937),
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(height: 0.5),
+                          Text(
+                            _fullName.isEmpty ? "Resident" : _fullName,
+                            style: const TextStyle(
+                              color: Color(0xFF1E1E1E),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              height: 1.02,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
                       _buildTopActionButton(
-                        icon: Icons.notifications_none_rounded,
                         onTap: _openAnnouncementNotifications,
                       ),
                       if (_unreadAnnouncementCount > 0)
                         Positioned(
-                          right: 2,
-                          top: 2,
+                          right: 1,
+                          top: 1,
                           child: Container(
-                            width: 10,
-                            height: 10,
+                            width: 8,
+                            height: 8,
                             decoration: BoxDecoration(
                               color: _gold,
                               borderRadius: BorderRadius.circular(999),
@@ -2376,12 +2844,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             Container(
               width: double.infinity,
               color: _brandBlue,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
               child: const Text(
                 "Stay updated with the latest community news and access essential barangay services.",
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 15,
+                  fontSize: 17,
                   height: 1.35,
                 ),
               ),
@@ -2423,12 +2891,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 2),
                 _buildSectionHeader(
                   title: "Announcement",
                   actionText: "View all",
                   onAction: _openAnnouncementNotifications,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 _buildHomeAnnouncementHighlight(),
                 const SizedBox(height: 24),
                 const Text(
@@ -2463,9 +2932,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Ongoing Services",
                   style: TextStyle(
-                    color: Color(0xFF344250),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF424751),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2500,8 +2969,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                               children: [
                                 _buildServiceStatusCard(
                                   icon: Icons.campaign_outlined,
-                                  iconColor: _brandBlue,
-                                  iconBg: _softBlue,
+                                  iconColor: Color(0xFF17365D),
+                                  iconBg: Color(0xFFF1F3F5),
                                   title: category,
                                   subtitle: subtitle,
                                   onTap: () => _showReportDetails(report),
@@ -2518,9 +2987,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Recent Activity",
                   style: TextStyle(
-                    color: Color(0xFF344250),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF424751),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2613,33 +3082,33 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 GestureDetector(
                   onTap: allowBackToMenu
                       ? () {
-                          setState(
-                              () => _serviceView = _ResidentServiceView.menu);
+                          setState(() {
+                            _serviceView = _ResidentServiceView.menu;
+                          });
                         }
                       : null,
                   child: Text(
                     sectionLabel,
                     style: TextStyle(
                       color: _brandBlue,
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight:
-                          allowBackToMenu ? FontWeight.w700 : FontWeight.w500,
+                          allowBackToMenu ? FontWeight.w700 : FontWeight.w600,
                     ),
                   ),
                 ),
                 const Spacer(),
                 _buildTopActionButton(
-                  icon: Icons.notifications_none_rounded,
                   onTap: _openAnnouncementNotifications,
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 30),
             Text(
               title,
               style: const TextStyle(
-                color: _brandBlue,
-                fontSize: 32,
+                color: Color(0xFF004687),
+                fontSize: 40,
                 fontWeight: FontWeight.w800,
                 height: 1.12,
               ),
@@ -2648,8 +3117,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             Text(
               subtitle,
               style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 15,
+                color: Color(0xFF424751),
+                fontSize: 18,
                 height: 1.4,
               ),
             ),
@@ -2662,80 +3131,84 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildServiceEntryCard({
     required Color accent,
     required Color background,
+    required Color borderColor,
     required IconData icon,
     required String title,
     required String description,
     required String cta,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Ink(
-        padding: const EdgeInsets.fromLTRB(28, 26, 24, 22),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE0E7F0)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(14),
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => _runAfterTapFeedback(onTap),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(30, 32, 28, 32),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 35),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color(0xFF1F2937),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xFF000000),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              description,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 13,
-                height: 1.45,
+                ],
               ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  cta,
-                  style: const TextStyle(
-                    color: _brandBlue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
+              const SizedBox(height: 14),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Color(0xFF424751),
+                  fontSize: 15,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cta,
+                    style: const TextStyle(
+                      color: _brandBlue,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 5),
-                const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: _brandBlue,
-                  size: 14,
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 7),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: _brandBlue,
+                    size: 19,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2749,7 +3222,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () => _runAfterTapFeedback(onTap),
         borderRadius: BorderRadius.circular(14),
         child: InputDecorator(
           decoration: InputDecoration(
@@ -2928,8 +3401,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildServicesMenuTab() {
-    return ListView(
-      padding: EdgeInsets.zero,
+    return Column(
       children: [
         _buildServicesTopBar(
           sectionLabel: "Services",
@@ -2937,41 +3409,52 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           subtitle:
               "Access essential barangay services, request official documentation, or report local concerns directly to your community leaders.",
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _pageHorizontalPadding,
-            28,
-            _pageHorizontalPadding,
-            24,
-          ),
-          child: Column(
-            children: [
-              _buildServiceEntryCard(
-                accent: _gold,
-                background: const Color(0xFFFFFAEF),
-                icon: Icons.campaign_outlined,
-                title: "File a Report",
-                description:
-                    "Report emergencies, infrastructure issues, or community concerns directly.",
+        Expanded(
+          child: StretchingOverscrollIndicator(
+            axisDirection: AxisDirection.down,
+            child: ListView(
+              clipBehavior: Clip.none,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                _pageHorizontalPadding,
+                26,
+                _pageHorizontalPadding,
+                24,
+              ),
+              children: [
+                _buildServiceEntryCard(
+                  accent: _gold,
+                  background: const Color(0xFFFFF7E6),
+                  borderColor: const Color(0xFFFFDC8A),
+                  icon: Icons.campaign_outlined,
+                  title: "File a Report",
+                  description:
+                      "Report emergencies, infrastructure issues, or community concerns directly.",
                 cta: "PROCEED",
-                onTap: () => setState(() {
-                  _serviceView = _ResidentServiceView.reportForm;
-                }),
+                onTap: () {
+                  setState(() {
+                    _serviceView = _ResidentServiceView.reportForm;
+                  });
+                },
               ),
-              const SizedBox(height: 22),
-              _buildServiceEntryCard(
-                accent: const Color(0xFF0D8B83),
-                background: const Color(0xFFF2FBFA),
-                icon: Icons.description_outlined,
-                title: "Request Certificate",
-                description:
-                    "Apply for Barangay Clearance, Residency, and other official certificates.",
+                const SizedBox(height: 20),
+                _buildServiceEntryCard(
+                  accent: const Color(0xFF0D8B83),
+                  background: const Color(0xFFEAFBF4),
+                  borderColor: const Color(0xFFB7E6DB),
+                  icon: Icons.description_outlined,
+                  title: "Request Document",
+                  description:
+                      "Apply for Barangay Clearance, Residency, and other official documents.",
                 cta: "APPLY NOW",
-                onTap: () => setState(() {
-                  _serviceView = _ResidentServiceView.certificates;
-                }),
+                onTap: () {
+                  setState(() {
+                    _serviceView = _ResidentServiceView.certificates;
+                  });
+                },
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -3182,98 +3665,104 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildRequestCard(Map<String, dynamic> report) {
     final status = (report['status'] as String?) ?? "pending";
     final statusLabel = _statusLabel(status).toUpperCase();
-    final statusColor = _statusChipColor(status);
+    final normalizedStatus = status.toLowerCase();
+    final statusChipStyle =
+        (normalizedStatus == "in_process" || normalizedStatus == "in progress")
+            ? (bg: const Color(0xFFDBEAFE), text: const Color(0xFF1E40AF))
+            : (normalizedStatus == "completed" || normalizedStatus == "resolved")
+                ? (bg: const Color(0xFFD1FAE5), text: const Color(0xFF065F46))
+                : (bg: const Color(0xFFFEF3C7), text: const Color(0xFFD79321));
     final category = (report['category'] as String?)?.trim();
-    final description = (report['description'] as String?)?.trim();
     final title = (category != null && category.isNotEmpty)
         ? category
         : "Community concern";
-    final subtitle = (description != null && description.isNotEmpty)
-        ? description
-        : "Track the latest update for this request.";
-    final normalizedStatus = status.toLowerCase();
+    final subtitle = "Status change to ${_statusLabel(status).toLowerCase()}";
     final iconData =
         normalizedStatus == "completed" || normalizedStatus == "resolved"
             ? Icons.description_outlined
             : Icons.campaign_outlined;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE4EAF2)),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showReportDetails(report),
+        onTap: () => _runAfterTapFeedback(
+          () => _showReportDetails(report),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF2F5F8),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
                   iconData,
-                  color: const Color(0xFF64748B),
-                  size: 22,
+                  color: const Color(0xFF000000),
+                  size: 24,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+                        horizontal: 12,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.15),
+                        color: statusChipStyle.bg,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         statusLabel,
                         style: TextStyle(
-                          color: statusColor,
-                          fontSize: 10,
+                          color: statusChipStyle.text,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF1F2937),
-                        fontSize: 15,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        height: 1.15,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 13,
-                        height: 1.35,
+                        color: Color(0xFF424751),
+                        fontSize: 14,
+                        height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     InkWell(
-                      onTap: () => _showReportDetails(report),
+                      onTap: () => _runAfterTapFeedback(
+                        () => _showReportDetails(report),
+                      ),
                       borderRadius: BorderRadius.circular(999),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 2),
@@ -3284,7 +3773,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                               "View details",
                               style: TextStyle(
                                 color: _brandBlue,
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -3475,9 +3964,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                                   child: Text(
                                     entry.key,
                                     style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF424751),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
@@ -3496,67 +3985,37 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildProfileTile({
     required IconData icon,
     required String title,
-    required String subtitle,
     required VoidCallback onTap,
-    bool danger = false,
   }) {
-    final iconColor = danger ? const Color(0xFFEF4444) : _brandBlue;
-    final borderColor =
-        danger ? const Color(0xFFF6D3D7) : const Color(0xFFE2E8F0);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        onTap: () => _runAfterTapFeedback(onTap),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
           child: Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: danger
-                            ? const Color(0xFFD9485F)
-                            : const Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Icon(
+                icon,
+                color: const Color(0xFF48627E),
+                size: 24,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF1F2937),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(
                 Icons.chevron_right_rounded,
-                color:
-                    danger ? const Color(0xFFCC6E7A) : const Color(0xFF94A3B8),
+                color: Color(0xFF7B8794),
+                size: 22,
               ),
             ],
           ),
@@ -3571,24 +4030,24 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required String text,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: const Color(0xFFF5F7FA),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              size: 24,
-              color: const Color(0xFF4E657C),
+              size: 25,
+              color: _brandBlue,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3602,14 +4061,14 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     letterSpacing: 0.6,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   text,
                   style: const TextStyle(
-                    color: Color(0xFF1F2937),
-                    fontSize: 15,
+                    color: Color(0xFF111827),
+                    fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    height: 1.3,
+                    height: 1.25,
                   ),
                 ),
               ],
@@ -3645,7 +4104,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           child: _profileImage.trim().isEmpty
               ? const Icon(
                   Icons.person,
-                  size: 58,
+                  size: 66,
                   color: Color(0xFFD0D6DC),
                 )
               : null,
@@ -3705,6 +4164,273 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
+  Future<void> _showProfileContentSheet({
+    required String title,
+    required List<Widget> children,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(14),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.78,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: Color(0xFF004687),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+                    children: children,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileSheetParagraph(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF424751),
+          fontSize: 14,
+          height: 1.45,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileSheetInfoRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: _brandBlue, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF004687),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF424751),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFaqSheet() {
+    _showProfileContentSheet(
+      title: "FAQ",
+      children: const [
+        _ProfileFaqItem(
+          question: "How do I file a report?",
+          answer:
+              "Go to Services, tap File a Report, choose a category, add details, upload photos, pin the location, and submit.",
+        ),
+        _ProfileFaqItem(
+          question: "How can I track my report?",
+          answer:
+              "Open Activity to view your report status. Tap View details to see the timeline and official updates.",
+        ),
+        _ProfileFaqItem(
+          question: "How do I request a document?",
+          answer:
+              "Go to Services, tap Request Document, choose the certificate you need, and submit the request form.",
+        ),
+        _ProfileFaqItem(
+          question: "Why is my account marked verified?",
+          answer:
+              "Verified Resident means your account information has been validated by the barangay records team.",
+        ),
+      ],
+    );
+  }
+
+  void _showContactBarangaySheet() {
+    _showProfileContentSheet(
+      title: "Contact Barangay Hall",
+      children: [
+        _buildProfileSheetInfoRow(
+          icon: Icons.location_on_outlined,
+          title: "Barangay Hall Address",
+          subtitle: "Bancao-Bancao, Puerto Princesa City",
+        ),
+        _buildProfileSheetInfoRow(
+          icon: Icons.call_outlined,
+          title: "Contact Number",
+          subtitle: "+63 917 123 4567",
+        ),
+        _buildProfileSheetInfoRow(
+          icon: Icons.schedule_outlined,
+          title: "Office Hours",
+          subtitle: "Monday to Friday, 8:00 AM to 5:00 PM",
+        ),
+        _buildProfileSheetInfoRow(
+          icon: Icons.mail_outline_rounded,
+          title: "Email",
+          subtitle: "barangay.bancaobancao@example.com",
+        ),
+      ],
+    );
+  }
+
+  void _showTermsSheet() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const _BarangayTermsOfServiceScreen(),
+      ),
+    );
+  }
+
+  Future<void> _showNotificationPreferencesSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void updatePreference(void Function() update) {
+              setState(update);
+              setSheetState(() {});
+            }
+
+            return SafeArea(
+              child: Container(
+                margin: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 14, 8, 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              "Notification Preferences",
+                              style: TextStyle(
+                                color: Color(0xFF004687),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(sheetContext),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: _notifyAnnouncements,
+                      activeColor: _brandBlue,
+                      title: const Text("Barangay announcements"),
+                      subtitle: const Text("Get notified about public updates."),
+                      onChanged: (value) => updatePreference(
+                        () => _notifyAnnouncements = value,
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: _notifyReportUpdates,
+                      activeColor: _brandBlue,
+                      title: const Text("Report updates"),
+                      subtitle:
+                          const Text("Receive status changes for reports."),
+                      onChanged: (value) => updatePreference(
+                        () => _notifyReportUpdates = value,
+                      ),
+                    ),
+                    SwitchListTile(
+                      value: _notifyDocumentUpdates,
+                      activeColor: _brandBlue,
+                      title: const Text("Document requests"),
+                      subtitle:
+                          const Text("Receive certificate request updates."),
+                      onChanged: (value) => updatePreference(
+                        () => _notifyDocumentUpdates = value,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildProfileTab() {
     return SafeArea(
       bottom: false,
@@ -3723,49 +4449,48 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   "Profile",
                   style: TextStyle(
                     color: _brandBlue,
-                    fontSize: 13,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               _buildTopActionButton(
-                icon: Icons.notifications_none_rounded,
                 onTap: _openAnnouncementNotifications,
               ),
             ],
           ),
           const SizedBox(height: 12),
           Center(child: _buildProfileHeaderAvatar()),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Center(
             child: Text(
               _fullName.isEmpty ? "Resident" : _fullName,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF1F2937),
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
                 height: 1.15,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           Center(child: _buildVerifiedResidentBadge()),
-          const SizedBox(height: 20),
+          const SizedBox(height: 26),
           const Text(
             "Personal Information",
             style: TextStyle(
-              color: Color(0xFF1F2937),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
               children: [
@@ -3789,47 +4514,78 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          _buildProfileTile(
-            icon: Icons.edit_outlined,
-            title: "Edit Profile",
-            subtitle: "Update your resident details.",
-            onTap: _openEditProfile,
-          ),
-          _buildProfileTile(
-            icon: Icons.shield_outlined,
-            title: "Privacy & Security",
-            subtitle: "Manage your account password and privacy.",
-            onTap: _openPrivacySecurity,
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              onPressed: _logout,
-              icon: const Icon(
-                Icons.logout_rounded,
-                color: Color(0xFFD73A49),
-                size: 18,
-              ),
-              label: const Text(
-                "Logout from Account",
-                style: TextStyle(
-                  color: Color(0xFFD73A49),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+          const SizedBox(height: 26),
+          const Text(
+            "Account",
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 2),
-          const Center(
-            child: Text(
-              "VERSION 2.4.1 (BUILD 82)",
-              style: TextStyle(
-                color: Color(0xFF9AA5B1),
-                fontSize: 10,
-                letterSpacing: 0.5,
-              ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                _buildProfileTile(
+                  icon: Icons.edit_outlined,
+                  title: "Edit Profile",
+                  onTap: _openEditProfile,
+                ),
+                const Divider(height: 1, color: Color(0xFFF3F6F9)),
+                _buildProfileTile(
+                  icon: Icons.shield_outlined,
+                  title: "Privacy & Security",
+                  onTap: _openPrivacySecurity,
+                ),
+                const Divider(height: 1, color: Color(0xFFF3F6F9)),
+                _buildProfileTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: "Notification Preferences",
+                  onTap: _showNotificationPreferencesSheet,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
+          const Text(
+            "Help & Support",
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                _buildProfileTile(
+                  icon: Icons.help_outline_rounded,
+                  title: "FAQ",
+                  onTap: _showFaqSheet,
+                ),
+                const Divider(height: 1, color: Color(0xFFF3F6F9)),
+                _buildProfileTile(
+                  icon: Icons.support_agent_rounded,
+                  title: "Contact Barangay Hall",
+                  onTap: _showContactBarangaySheet,
+                ),
+                const Divider(height: 1, color: Color(0xFFF3F6F9)),
+                _buildProfileTile(
+                  icon: Icons.gavel_rounded,
+                  title: "Terms of Service",
+                  onTap: _showTermsSheet,
+                ),
+              ],
             ),
           ),
         ],
@@ -3888,9 +4644,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         }),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined, color: Color(0xFF64748B), size: 31),
+            icon: _BottomNavIcon(
+              icon: Icons.home_outlined,
+              color: Color(0xFF64748B),
+            ),
             selectedIcon:
-                Icon(Icons.home_outlined, color: _brandBlue, size: 31),
+                _BottomNavIcon(icon: Icons.home_outlined, color: _brandBlue),
             label: "Home",
           ),
           NavigationDestination(
@@ -3899,18 +4658,271 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             label: "Services",
           ),
           NavigationDestination(
-            icon:
-                Icon(Icons.history_rounded, color: Color(0xFF64748B), size: 31),
+            icon: _BottomNavIcon(
+              icon: Icons.history_rounded,
+              color: Color(0xFF64748B),
+            ),
             selectedIcon:
-                Icon(Icons.history_rounded, color: _brandBlue, size: 31),
+                _BottomNavIcon(icon: Icons.history_rounded, color: _brandBlue),
             label: "Activity",
           ),
           NavigationDestination(
-            icon:
-                Icon(Icons.person_outline, color: Color(0xFF64748B), size: 31),
+            icon: _BottomNavIcon(
+              icon: Icons.person_outline,
+              color: Color(0xFF64748B),
+            ),
             selectedIcon:
-                Icon(Icons.person_outline, color: _brandBlue, size: 31),
+                _BottomNavIcon(icon: Icons.person_outline, color: _brandBlue),
             label: "Profile",
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BarangayTermsOfServiceScreen extends StatelessWidget {
+  const _BarangayTermsOfServiceScreen();
+
+  static const _sections = [
+    (
+      title: "1. Purpose of the Service",
+      body:
+          "This mobile application is provided as a digital channel for residents to communicate with the barangay, submit incident reports, request barangay documents, receive announcements, and monitor the status of submitted services. It supports official barangay operations but does not replace direct coordination with barangay personnel during emergencies or urgent public safety concerns.",
+    ),
+    (
+      title: "2. Resident Account Responsibility",
+      body:
+          "Residents are responsible for keeping their account information accurate, updated, and secure. Names, contact numbers, email addresses, residency information, and verification details must reflect true resident records. Users must not share account access with another person or use another resident's account to submit requests.",
+    ),
+    (
+      title: "3. Accurate Reports and Requests",
+      body:
+          "All incident reports, service requests, photos, descriptions, and pinned locations must be truthful and related to legitimate barangay concerns. Reports may include road damage, drainage issues, garbage collection concerns, public safety matters, damaged facilities, or other community service issues. False, misleading, duplicate, malicious, or abusive submissions may be rejected, archived, or referred for review.",
+    ),
+    (
+      title: "4. Emergency and Safety Limitations",
+      body:
+          "The app may be used to report community concerns, but it is not a substitute for emergency hotlines, rescue units, medical responders, police assistance, or direct barangay emergency response. For immediate threats to life, health, fire, crime, disaster, or serious injury, residents should contact the appropriate emergency hotline or proceed directly to the barangay hall or nearest authority.",
+    ),
+    (
+      title: "5. Document Request Processing",
+      body:
+          "Requests for barangay clearance, residency certification, and other official documents are subject to verification, eligibility requirements, barangay records, required fees if applicable, and approval by authorized personnel. Submission through the app does not guarantee automatic approval. The barangay may request additional information before releasing any document.",
+    ),
+    (
+      title: "6. Use of Personal Information",
+      body:
+          "Personal information submitted through the app may be used for resident verification, report validation, document processing, official communication, audit trails, service monitoring, and barangay record keeping. The barangay will handle resident information with reasonable care and will limit access to authorized personnel who need the information for official duties.",
+    ),
+    (
+      title: "7. Photos, Location, and Supporting Evidence",
+      body:
+          "Residents may upload photos and provide map locations to help barangay personnel identify and assess reported issues. Uploaded images should be relevant to the report and must not intentionally expose private, sensitive, harmful, or unrelated personal content. Location data is used to locate the reported concern and support response planning.",
+    ),
+    (
+      title: "8. Notifications and Official Updates",
+      body:
+          "The app may send announcements, report status changes, document updates, and other service notifications. Status timelines and official updates are provided for resident convenience and may change as barangay personnel verify, assign, inspect, resolve, or close requests. Residents should review updates regularly and follow any instructions provided by the barangay.",
+    ),
+    (
+      title: "9. Prohibited Use",
+      body:
+          "Residents must not use the app to harass others, submit offensive content, impersonate another person, upload harmful files, disrupt system operations, attempt unauthorized access, spread false information, or use barangay services for fraudulent activity. Any misuse may result in request rejection, account restriction, or referral to appropriate authorities when necessary.",
+    ),
+    (
+      title: "10. Availability and Technical Limitations",
+      body:
+          "The barangay aims to keep the app available and useful, but service interruptions may occur due to internet connectivity, maintenance, device issues, server downtime, mapping limitations, or third-party service interruptions. Residents may still contact the barangay hall directly when the app is unavailable or when a request requires immediate attention.",
+    ),
+    (
+      title: "11. Review, Correction, and Follow-Up",
+      body:
+          "Barangay personnel may review submitted information, correct categorization, update status, contact the resident for clarification, or close requests that are resolved, invalid, incomplete, or outside barangay jurisdiction. Residents may be asked to provide additional details to support proper action.",
+    ),
+    (
+      title: "12. Changes to These Terms",
+      body:
+          "These terms may be updated to reflect changes in barangay procedures, application features, privacy practices, or service requirements. Continued use of the app after updates means the resident agrees to follow the revised terms. Residents are encouraged to review this page periodically.",
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF004687),
+                    size: 20,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    "Terms of Service",
+                    style: TextStyle(
+                      color: Color(0xFF004687),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFEEEEEE)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Barangay Digital Services Terms",
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "Last updated: May 16, 2026",
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    "Please read these terms carefully before using the barangay mobile application. These terms explain resident responsibilities, service limitations, and how submitted information may be used for official barangay services.",
+                    style: TextStyle(
+                      color: Color(0xFF424751),
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            ..._sections.map(
+              (section) => _TermsSectionCard(
+                title: section.title,
+                body: section.body,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TermsSectionCard extends StatelessWidget {
+  const _TermsSectionCard({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF004687),
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: const TextStyle(
+              color: Color(0xFF424751),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileFaqItem extends StatelessWidget {
+  const _ProfileFaqItem({
+    required this.question,
+    required this.answer,
+  });
+
+  final String question;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        iconColor: const Color(0xFF0B4F94),
+        collapsedIconColor: const Color(0xFF7B8794),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(
+          question,
+          style: const TextStyle(
+            color: Color(0xFF004687),
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        children: [
+          Text(
+            answer,
+            style: const TextStyle(
+              color: Color(0xFF424751),
+              fontSize: 13,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -3928,8 +4940,8 @@ class _ServicesNavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 31,
-      height: 31,
+      width: _ResidentDashboardScreenState._bottomNavIconSize,
+      height: _ResidentDashboardScreenState._bottomNavIconSize,
       child: Center(
         child: Wrap(
           spacing: 4,
@@ -3945,6 +4957,31 @@ class _ServicesNavIcon extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomNavIcon extends StatelessWidget {
+  const _BottomNavIcon({
+    required this.icon,
+    required this.color,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _ResidentDashboardScreenState._bottomNavIconSize,
+      height: _ResidentDashboardScreenState._bottomNavIconSize,
+      child: Center(
+        child: Icon(
+          icon,
+          color: color,
+          size: _ResidentDashboardScreenState._bottomNavIconSize,
         ),
       ),
     );

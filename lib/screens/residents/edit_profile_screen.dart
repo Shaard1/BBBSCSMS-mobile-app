@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../widgets/top_toast.dart';
 import '../crop_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -44,15 +46,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _fullNameController = TextEditingController(text: widget.fullName);
     _addressController = TextEditingController(text: widget.address);
-    _contactController = TextEditingController(text: widget.contactNumber);
+    _contactController = TextEditingController(
+      text: _normalizeContactNumber(widget.contactNumber),
+    );
   }
 
   @override
   void dispose() {
+    TopToast.dismiss();
     _fullNameController.dispose();
     _addressController.dispose();
     _contactController.dispose();
     super.dispose();
+  }
+
+  void _showTopToast(String message) {
+    if (!mounted) return;
+    TopToast.show(context, message, backgroundColor: _brandBlue);
   }
 
   Future<void> _pickProfileImage() async {
@@ -118,9 +128,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Image error: $e")),
-      );
+      _showTopToast("Image error: $e");
     }
   }
 
@@ -142,20 +150,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final contactNumber = _contactController.text.trim();
 
     if (fullName.isEmpty || address.isEmpty || contactNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text("Please fill in your name, address, and contact number."),
-        ),
-      );
+      _showTopToast("Please fill in your name, address, and contact number.");
+      return;
+    }
+
+    if (!RegExp(r'^\d{11}$').hasMatch(contactNumber)) {
+      _showTopToast("Please enter exactly 11 digits for contact number.");
       return;
     }
 
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Session expired. Please log in again.")),
-      );
+      _showTopToast("Session expired. Please log in again.");
       return;
     }
 
@@ -225,9 +231,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save profile: $e")),
-      );
+      _showTopToast("Failed to save profile: $e");
       setState(() => _isSaving = false);
       return;
     }
@@ -237,8 +241,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(
-        color: Color(0xFF8FA2B8),
-        fontSize: 13,
+        color: Color(0xFF424751),
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+      ),
+      floatingLabelStyle: const TextStyle(
+        color: Color(0xFF424751),
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
       ),
       filled: true,
       fillColor: Colors.white,
@@ -256,6 +266,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         borderSide: const BorderSide(color: _brandBlue, width: 1.4),
       ),
     );
+  }
+
+  String _normalizeContactNumber(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('63') && digits.length == 12) {
+      return '0${digits.substring(2)}';
+    }
+    if (digits.length > 11) {
+      return digits.substring(0, 11);
+    }
+    return digits;
   }
 
   @override
@@ -380,6 +401,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextField(
                       controller: _fullNameController,
                       textCapitalization: TextCapitalization.words,
+                      style: const TextStyle(
+                        color: Color(0xFF424751),
+                        fontSize: 16,
+                        height: 1.35,
+                      ),
                       decoration: _fieldDecoration("Full name"),
                     ),
                     const SizedBox(height: 12),
@@ -387,12 +413,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _addressController,
                       textCapitalization: TextCapitalization.words,
                       maxLines: 2,
+                      style: const TextStyle(
+                        color: Color(0xFF424751),
+                        fontSize: 16,
+                        height: 1.35,
+                      ),
                       decoration: _fieldDecoration("Address"),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _contactController,
-                      keyboardType: TextInputType.phone,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        color: Color(0xFF424751),
+                        fontSize: 16,
+                        height: 1.35,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(11),
+                      ],
                       decoration: _fieldDecoration("Contact number"),
                     ),
                     const SizedBox(height: 18),

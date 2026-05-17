@@ -35,6 +35,19 @@ class AuthService {
 
     final userId = response.user!.id;
 
+    // First, check if user is an admin in the profiles table
+    final profile = await _client
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+    // If user has admin role, allow login
+    if (profile != null && profile['role'] == 'admin') {
+      return 'admin';
+    }
+
+    // For non-admin users, check the residents table for approval status
     final resident = await _client
         .from('residents')
         .select('status, rejection_reason, full_name')
@@ -65,12 +78,7 @@ class AuthService {
       );
     }
 
-    final profile = await _client
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle();
-
+    // Create or update profile for resident
     if (profile == null) {
       try {
         await _client.from('profiles').insert({

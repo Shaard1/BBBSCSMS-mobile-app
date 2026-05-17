@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../widgets/top_toast.dart';
+
 class AddResidentScreen extends StatefulWidget {
   const AddResidentScreen({super.key});
 
@@ -19,6 +21,11 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
   String civilStatus = 'Single';
   bool isLoading = false;
 
+  void _showTopToast(String message) {
+    if (!mounted) return;
+    TopToast.show(context, message);
+  }
+
   /*--------------------- ADD RESIDENT -------------------------------*/
 
   Future<void> addResident() async {
@@ -27,9 +34,7 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
         birthdateController.text.trim().isEmpty ||
         addressController.text.trim().isEmpty ||
         contactController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      _showTopToast('Please fill all fields');
       return;
     }
 
@@ -54,9 +59,7 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showTopToast('Error: $e');
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
