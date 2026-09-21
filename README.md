@@ -67,11 +67,11 @@ BBBSCSMS Mobile App is a capstone project developed as a resident-facing mobile 
 - Customizable alert settings
 
 ### 🔐 Secure Authentication
-- Mobile number verification (OTP)
+- Email and password authentication
+- Barangay resident approval workflow
 - Secure account creation
 - Password recovery
 - Session management
-- Two-factor authentication option
 
 ## Tech Stack
 
@@ -147,14 +147,12 @@ lib/
    ```
 
 3. **Configure Supabase**
-   - Get your Supabase project URL and anonymous key
-   - Update the configuration in your initialization file:
-   ```dart
-   // Example in main.dart
-   await Supabase.initialize(
-     url: 'YOUR_SUPABASE_URL',
-     anonKey: 'YOUR_SUPABASE_ANON_KEY',
-   );
+   - Get your Supabase project URL and publishable (formerly anon) key.
+   - Pass them at runtime so credentials are not duplicated across source files:
+   ```bash
+   flutter run \
+     --dart-define=SUPABASE_URL=https://your-project.supabase.co \
+     --dart-define=SUPABASE_PUBLISHABLE_KEY=your_publishable_key
    ```
 
 
@@ -167,12 +165,10 @@ lib/
 
 ### Creating an Account
 1. Open the app and tap "Register"
-2. Enter your name and mobile number
-3. Verify OTP sent to your number
-4. Create a password
-5. Complete your profile information
-6. Accept terms and conditions
-7. Start using the app
+2. Enter your email, password, and resident information
+3. Upload the required identity-document photos
+4. Submit the registration for barangay approval
+5. Log in after the account is approved
 
 ### Reporting an Issue
 1. Navigate to "Report Issue" from the home screen
@@ -206,7 +202,7 @@ lib/
 ## API Integration
 
 The mobile app integrates with:
-- **Supabase Authentication** - Phone-based OTP login
+- **Supabase Authentication** - Email/password login and session management
 - **Supabase Realtime Database** - Real-time data updates
 - **Supabase Storage** - Photo/video storage
 
@@ -237,12 +233,9 @@ flutter build apk --release
 
 ## Configuration & Environment Variables
 
-Create a `.env` file in the project root:
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
-LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
-```
+The app reads `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from
+`--dart-define`. `SUPABASE_ANON_KEY` remains accepted as a backward-compatible
+fallback. The app does not load a `.env` file.
 
 ## Permissions Required
 
@@ -250,8 +243,6 @@ LOCATION_PERMISSION_MESSAGE=Allow app to access your location?
 - `android.permission.ACCESS_FINE_LOCATION`
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.CAMERA`
-- `android.permission.READ_EXTERNAL_STORAGE`
-- `android.permission.WRITE_EXTERNAL_STORAGE`
 
 **iOS**:
 - `NSLocationWhenInUseUsageDescription`

@@ -461,77 +461,82 @@ class _RegisterVerificationScreenState extends State<RegisterVerificationScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              _buildSectionTitle(3, 'Verification'),
-              const SizedBox(height: 12),
-              const Text(
-                'Take Photo of Your ID',
-                style: TextStyle(
-                  color: Color(0xFF11151A),
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
+                _buildSectionTitle(3, 'Verification'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Take Photo of Your ID',
+                  style: TextStyle(
+                    color: Color(0xFF11151A),
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Take a clear photo of the front and back of your government ID.',
-                style: TextStyle(
-                  color: Color(0xFF424751),
-                  fontSize: 16,
-                  height: 1.4,
+                const SizedBox(height: 8),
+                const Text(
+                  'Take a clear photo of the front and back of your government ID.',
+                  style: TextStyle(
+                    color: Color(0xFF424751),
+                    fontSize: 16,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _buildIdTypeDropdown(),
-              const SizedBox(height: 14),
-              _idPhotoTile(
-                label: 'Front',
-                image: _frontIdImage,
-                onTap: () => _pickIdImage(isFront: true),
-              ),
-              const SizedBox(height: 14),
-              _idPhotoTile(
-                label: 'Back',
-                image: _backIdImage,
-                onTap: () => _pickIdImage(isFront: false),
-              ),
-              if (hasError) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Color(0xFFFF4D4F), fontSize: 13),
-                ),
-              ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _completeVerification,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _brandBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 12),
+                _buildIdTypeDropdown(),
+                if (_idType != null) ...[
+                  const SizedBox(height: 14),
+                  _idPhotoTile(
+                    label: 'Front',
+                    image: _frontIdImage,
+                    onTap: () => _pickIdImage(isFront: true),
+                  ),
+                  const SizedBox(height: 14),
+                  _idPhotoTile(
+                    label: 'Back',
+                    image: _backIdImage,
+                    onTap: () => _pickIdImage(isFront: false),
+                  ),
+                ],
+                if (hasError) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Color(0xFFFF4D4F),
+                      fontSize: 13,
                     ),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: Colors.white,
+                ],
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _completeVerification,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _brandBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Complete Registration',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Complete Registration',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                  ),
                 ),
-              ),
               ],
             ),
           ),

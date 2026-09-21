@@ -24,6 +24,12 @@ class _ReportScreenState extends State<ReportScreen> {
   File? selectedImage;
   bool isLoading = false;
 
+  @override
+  void dispose() {
+    descriptionController.dispose();
+    super.dispose();
+  }
+
   void _showTopToast(String message) {
     if (!mounted) return;
     TopToast.show(context, message);
@@ -34,7 +40,7 @@ class _ReportScreenState extends State<ReportScreen> {
   Future<void> pickImage() async {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
-    if (image != null) {
+    if (image != null && mounted) {
       setState(() {
         selectedImage = File(image.path);
       });
@@ -47,7 +53,10 @@ class _ReportScreenState extends State<ReportScreen> {
     try {
       final fileName = path.basename(imageFile.path);
 
-      final filePath = "${supabase.auth.currentUser!.id}/"
+      final user = supabase.auth.currentUser;
+      if (user == null) return null;
+
+      final filePath = "${user.id}/"
           "${DateTime.now().millisecondsSinceEpoch}_$fileName";
 
       await supabase.storage.from('report-images').upload(filePath, imageFile);
@@ -56,8 +65,7 @@ class _ReportScreenState extends State<ReportScreen> {
           supabase.storage.from('report-images').getPublicUrl(filePath);
 
       return imageUrl;
-    } catch (e) {
-      debugPrint("Upload error: $e");
+    } catch (_) {
       return null;
     }
   }
@@ -67,8 +75,14 @@ class _ReportScreenState extends State<ReportScreen> {
   Future<void> submitReport() async {
     /* ---------------- VALIDATION ---------------- */
 
-    if (descriptionController.text.isEmpty || selectedImage == null) {
+    if (descriptionController.text.trim().isEmpty || selectedImage == null) {
       _showTopToast("Please add description and image");
+      return;
+    }
+
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      _showTopToast("Session expired. Please log in again.");
       return;
     }
 
@@ -86,7 +100,7 @@ class _ReportScreenState extends State<ReportScreen> {
       /* ---------------- INSERT TO DATABASE ---------------- */
 
       await supabase.from('reports').insert({
-        'user_id': supabase.auth.currentUser!.id,
+        'user_id': user.id,
         'description': descriptionController.text.trim(),
         'image_url': imageUrl,
         'latitude': 0, // temporary
@@ -107,10 +121,14 @@ class _ReportScreenState extends State<ReportScreen> {
       /* ---------------- SUCCESS MESSAGE ---------------- */
 
       _showTopToast("Report submitted successfully!");
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() => isLoading = false);
-
-      _showTopToast("Error: $e");
+      _showTopToast("Unable to submit report right now.");
+    } finally {
+      if (mounted && isLoading) {
+        setState(() => isLoading = false);
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:path/path.dart' as path;
@@ -56,6 +57,7 @@ enum _ResidentServiceView {
   menu,
   reportForm,
   certificates,
+  certificateRequestForm,
 }
 
 class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
@@ -63,14 +65,51 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       'lib/assets/Verified Resident badge.svg';
   static const String _verifiedCheckAsset =
       'lib/assets/Verified check badge.svg';
+  static const String _demoGcashReceiverName = 'Demo GCash Receiver';
+  static const String _demoGcashReceiverNumber = '09XXXXXXXXX';
   final SupabaseClient _supabase = Supabase.instance.client;
   final AnnouncementService _announcementService = AnnouncementService();
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _descriptionController = TextEditingController();
+  final Map<String, TextEditingController> _certificateControllers = {
+    for (final key in [
+      'full_name',
+      'address',
+      'contact_number',
+      'email',
+      'payment_reference',
+      'date_of_birth',
+      'civil_status',
+      'purpose',
+      'additional_notes',
+      'institution_agency',
+      'reason_for_request',
+      'length_of_stay',
+      'loan_purpose',
+      'lending_company',
+      'loan_amount',
+      'gender',
+      'occupation',
+      'emergency_contact_name',
+      'emergency_contact_number',
+      'certification_details',
+      'requesting_party',
+      'business_name',
+      'business_address',
+      'business_type',
+      'years_of_operation',
+      'operator_name',
+      'plate_number',
+      'route_area',
+      'banca_name',
+      'banca_registration_number',
+      'operation_area',
+    ])
+      key: TextEditingController(),
+  };
 
   static const int _minAnnouncementFontSize = 1;
   static const int _maxAnnouncementFontSize = 144;
-  static const Color _teal = Color(0xFF0B7A6D);
   static const Color _brandBlue = Color(0xFF0B4F94);
   static const Color _gold = Color(0xFFF1A400);
   static const Color _softBlue = Color(0xFFEAF3FF);
@@ -96,56 +135,109 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   bool _isLoadingReports = true;
   bool _isLoadingAnnouncements = true;
   bool _isSubmittingReport = false;
+  bool _isSubmittingCertificateRequest = false;
   bool _isFetchingLocation = false;
   bool _notifyAnnouncements = true;
   bool _notifyReportUpdates = true;
   bool _notifyDocumentUpdates = true;
+  String _selectedAnnouncementFilter = "All";
 
   String _fullName = "";
   String _address = "Address not set";
   String _contactNumber = "No contact number";
   String _profileImage = "";
   String _reportLocationLabel = "Tap to choose location on map";
+  Map<String, dynamic>? _selectedCertificateRequest;
+  String _selectedCertificatePaymentMethod = "GCash";
+  String _selectedCertificateVariant = "Good Moral";
+  File? _selectedPaymentProofImage;
 
   static const int _maxReportImages = 10;
   final List<File> _selectedReportImages = [];
   double? _reportLatitude;
   double? _reportLongitude;
   List<Map<String, dynamic>> _reports = [];
+  List<Map<String, dynamic>> _documentRequests = [];
   List<Announcement> _announcements = [];
   Set<String> _readAnnouncementIds = {};
+  Map<String, String> _announcementAuthorNames = {};
 
   int get _unreadAnnouncementCount => _announcements
       .where((announcement) => !_readAnnouncementIds.contains(announcement.id))
       .length;
 
-  List<Map<String, String>> get _certificateOptions => const [
+  List<Map<String, dynamic>> get _certificateOptions => const [
         {
-          'title': 'Barangay Clearance',
-          'price': '\u20B1 50.00',
-          'description':
-              'For employment, business permit, or general identification.',
-          'meta': '1-2 Working Days',
+          'key': 'certificate_of_indigency',
+          'title': 'Certificate of Indigency',
+          'description': 'For social welfare services',
+          'fee': 'Free',
+          'icon': Icons.volunteer_activism_outlined,
+          'accent': Color(0xFFFF6B81),
+          'background': Color(0xFFFFEFF3),
         },
         {
-          'title': 'Cedula / Community Tax Certificate',
-          'price': '\u20B1 50.00',
-          'description':
-              'Required for various government and legal transactions.',
-          'meta': 'Instant Issuance',
+          'key': 'good_moral_residency',
+          'title': 'Good Moral / Residency',
+          'description': 'Proof of residency or standing',
+          'fee': 'Fee: \u20B1100',
+          'icon': Icons.home_outlined,
+          'accent': Color(0xFFE3B317),
+          'background': Color(0xFFFFF6D9),
         },
         {
-          'title': 'Indigency Certificate',
-          'price': 'FREE',
-          'description':
-              'For scholarship applications, medical assistance, and social welfare.',
-          'meta': 'Evaluation Required',
+          'key': 'barangay_clearance_for_loan',
+          'title': 'Barangay Clearance For Loan',
+          'description': 'Required for loan applications.',
+          'fee': 'Fee: \u20B1150',
+          'icon': Icons.description_outlined,
+          'accent': Color(0xFF4A90E2),
+          'background': Color(0xFFEAF3FF),
         },
         {
-          'title': 'Residency Certificate',
-          'price': 'FREE',
-          'description': 'Proof of residency within the barangay.',
-          'meta': '1-2 Working Days',
+          'key': 'barangay_id',
+          'title': 'Barangay ID',
+          'description': 'Official resident identification.',
+          'fee': 'Fee: \u20B1100',
+          'icon': Icons.badge_outlined,
+          'accent': Color(0xFF6C63FF),
+          'background': Color(0xFFF0EEFF),
+        },
+        {
+          'key': 'special_certification',
+          'title': 'Special Certification',
+          'description': 'For special legal or personal purposes.',
+          'fee': 'Fee: \u20B1100',
+          'icon': Icons.fact_check_outlined,
+          'accent': Color(0xFF9B6BDA),
+          'background': Color(0xFFF5ECFF),
+        },
+        {
+          'key': 'store_business_clearance',
+          'title': 'Store Business Clearance',
+          'description': 'Permit for sari-sari store operation.',
+          'fee': 'Fee: \u20B1500',
+          'icon': Icons.storefront_outlined,
+          'accent': Color(0xFF32B768),
+          'background': Color(0xFFE9F9EF),
+        },
+        {
+          'key': 'tricycle_clearance',
+          'title': 'Tricycle Clearance',
+          'description': 'Permit for tricycle business operation.',
+          'fee': 'Fee: \u20B1300',
+          'icon': Icons.pedal_bike_outlined,
+          'accent': Color(0xFFF5A623),
+          'background': Color(0xFFFFF2DE),
+        },
+        {
+          'key': 'banca_clearance',
+          'title': 'Banca Clearance',
+          'description': 'Permit for banca business operation.',
+          'fee': 'Fee: \u20B1300',
+          'icon': Icons.sailing_outlined,
+          'accent': Color(0xFF31B7AE),
+          'background': Color(0xFFE6FBF8),
         },
       ];
 
@@ -155,7 +247,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     _currentTab = widget.initialTabIndex;
     _fullName = widget.name.trim();
     _loadResidentProfile();
-    _fetchMyReports();
+    _fetchResidentActivity();
     _fetchAnnouncements();
   }
 
@@ -163,6 +255,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   void dispose() {
     TopToast.dismiss();
     _descriptionController.dispose();
+    for (final controller in _certificateControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -208,6 +303,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       final announcements =
           await _announcementService.fetchPublishedAnnouncements();
       Set<String> readIds = _readAnnouncementIds;
+      Map<String, String> authorNames = _announcementAuthorNames;
+
+      try {
+        authorNames = await _announcementService.fetchAuthorNamesByIds(
+          announcements.map((item) => item.createdBy).toList(),
+        );
+      } catch (_) {}
 
       if (user != null) {
         try {
@@ -220,6 +322,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       setState(() {
         _announcements = announcements;
         _readAnnouncementIds = readIds;
+        _announcementAuthorNames = authorNames;
         _isLoadingAnnouncements = false;
       });
     } catch (_) {
@@ -227,9 +330,23 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       setState(() {
         _announcements = [];
         _readAnnouncementIds = {};
+        _announcementAuthorNames = {};
         _isLoadingAnnouncements = false;
       });
     }
+  }
+
+  String _announcementCreatorLabel(Announcement announcement) {
+    final storedName = announcement.createdByName.trim();
+    if (storedName.isNotEmpty) {
+      return "By: $storedName";
+    }
+    final creatorId = announcement.createdBy.trim();
+    final creatorName = _announcementAuthorNames[creatorId]?.trim() ?? '';
+    if (creatorName.isNotEmpty) {
+      return "By: $creatorName";
+    }
+    return "By: Barangay Admin";
   }
 
   Future<void> _markAnnouncementsRead(List<String> announcementIds) async {
@@ -285,12 +402,25 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
+  Future<void> _fetchResidentActivity() async {
+    if (mounted) {
+      setState(() => _isLoadingReports = true);
+    }
+
+    await Future.wait([
+      _fetchMyReports(),
+      _fetchMyDocumentRequests(),
+    ]);
+
+    if (!mounted) return;
+    setState(() => _isLoadingReports = false);
+  }
+
   Future<void> _fetchMyReports() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       if (!mounted) return;
       setState(() {
-        _isLoadingReports = false;
         _reports = [];
       });
       return;
@@ -306,63 +436,53 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        _reports = List<Map<String, dynamic>>.from(data);
-        _isLoadingReports = false;
+        _reports = List<Map<String, dynamic>>.from(data).map((report) {
+          return {
+            ...report,
+            'activity_type': 'report',
+          };
+        }).toList();
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _reports = [];
-        _isLoadingReports = false;
       });
     }
   }
 
-  Future<void> _deleteMyReport(String reportId) async {
+  Future<void> _fetchMyDocumentRequests() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      _showSnackBar("Session expired. Please log in again.");
-      return;
-    }
-
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text("Delete report?"),
-          content: const Text(
-            "Are you sure you want to remove this report?",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text("Delete"),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldDelete != true) {
+      if (!mounted) return;
+      setState(() {
+        _documentRequests = [];
+      });
       return;
     }
 
     try {
-      await _supabase
-          .from('reports')
-          .delete()
-          .eq('id', reportId)
-          .eq('user_id', user.id);
+      final data = await _supabase
+          .from('document_requests')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
 
-      await _fetchMyReports();
-      _showSnackBar("Report deleted.");
-    } catch (e) {
-      _showSnackBar("Failed to delete report: $e");
+      if (!mounted) return;
+
+      setState(() {
+        _documentRequests = List<Map<String, dynamic>>.from(data).map((request) {
+          return {
+            ...request,
+            'activity_type': 'document_request',
+          };
+        }).toList();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _documentRequests = [];
+      });
     }
   }
 
@@ -504,12 +624,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         _serviceView = _ResidentServiceView.menu;
       });
 
-      await _fetchMyReports();
+      await _fetchResidentActivity();
       _showSnackBar("Report submitted successfully.");
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isSubmittingReport = false);
-      _showSnackBar("Failed to submit report: $e");
+      _showSnackBar("Failed to submit report. Please try again.");
     }
   }
 
@@ -601,8 +721,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             _formatCoordinates(position.latitude, position.longitude);
       });
       _showSnackBar("Current location captured.");
-    } catch (e) {
-      _showSnackBar("Failed to get location: $e");
+    } catch (_) {
+      _showSnackBar("Failed to get location. Please try again.");
     } finally {
       if (mounted) {
         setState(() => _isFetchingLocation = false);
@@ -648,25 +768,53 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     await action();
   }
 
-  Color _statusChipColor(String status) {
-    final normalized = status.toLowerCase();
-    if (normalized == "completed" || normalized == "resolved") {
-      return const Color(0xFF2E7D32);
-    }
-    if (normalized == "in_process" || normalized == "in progress") {
-      return const Color(0xFFEF6C00);
-    }
-    return const Color(0xFF9E9E00);
-  }
-
   String _statusLabel(String status) {
     final normalized = status.toLowerCase();
+    if (normalized == "awaiting_payment") return "Awaiting Payment";
+    if (normalized == "ready_for_release") return "Ready for Release";
+    if (normalized == "rejected") return "Rejected";
     if (normalized == "in_process" || normalized == "in progress") {
       return "In Progress";
     }
+    if (normalized == "processing") return "Processing";
     if (normalized == "completed") return "Completed";
     if (normalized == "resolved") return "Resolved";
     return "Pending";
+  }
+
+  ({Color bg, Color text}) _statusChipStyle(String status) {
+    final normalizedStatus = status.toLowerCase();
+    if (normalizedStatus == "completed" || normalizedStatus == "resolved") {
+      return (
+        bg: const Color(0xFFD1FAE5),
+        text: const Color(0xFF065F46),
+      );
+    }
+    if (normalizedStatus == "rejected") {
+      return (
+        bg: const Color(0xFFFEE2E2),
+        text: const Color(0xFFB91C1C),
+      );
+    }
+    if (normalizedStatus == "in_process" ||
+        normalizedStatus == "in progress" ||
+        normalizedStatus == "processing" ||
+        normalizedStatus == "ready_for_release") {
+      return (
+        bg: const Color(0xFFDBEAFE),
+        text: const Color(0xFF1E40AF),
+      );
+    }
+    if (normalizedStatus == "awaiting_payment") {
+      return (
+        bg: const Color(0xFFEDE9FE),
+        text: const Color(0xFF6D28D9),
+      );
+    }
+    return (
+      bg: const Color(0xFFFEF3C7),
+      text: const Color(0xFFD79321),
+    );
   }
 
   String _formatDetailedReportDate(String? rawValue) {
@@ -728,98 +876,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return urls.toSet().toList();
   }
 
-  void _showFullReportImage(String imageUrl) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.black,
-          insetPadding: const EdgeInsets.all(20),
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: 1,
-                maxScale: 5,
-                child: Center(
-                  child: Image.network(imageUrl, fit: BoxFit.contain),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  icon: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildReportLocationPreview(Map<String, dynamic> report) {
-    final latitude = (report['latitude'] as num?)?.toDouble();
-    final longitude = (report['longitude'] as num?)?.toDouble();
-
-    if (latitude == null || longitude == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF6F8F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD8E1E4)),
-        ),
-        child: const Text("No location data available."),
-      );
-    }
-
-    final point = LatLng(latitude, longitude);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        height: 180,
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: point,
-            initialZoom: 15,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
-            ),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-              userAgentPackageName: 'com.example.barangay_mobile_app',
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  width: 40,
-                  height: 40,
-                  point: point,
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.red,
-                    size: 38,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _showReportLocationDialog(Map<String, dynamic> report) async {
     final latitude = (report['latitude'] as num?)?.toDouble();
     final longitude = (report['longitude'] as num?)?.toDouble();
@@ -833,7 +889,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
           child: Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxHeight: 520),
@@ -941,6 +998,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
+  Future<void> _showDocumentRequestDetails(Map<String, dynamic> request) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _buildDocumentRequestDetailsPage(request),
+      ),
+    );
+  }
+
   Widget _buildReportDetailsPage(Map<String, dynamic> report) {
     final images = _extractReportImages(report);
     final latitude = (report['latitude'] as num?)?.toDouble();
@@ -955,9 +1021,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     final adminNote = report['admin_note']?.toString().trim() ?? '';
     final status = _statusLabel(report['status']?.toString() ?? 'pending');
     final createdAt = report['created_at']?.toString();
-    final locationText = latitude != null && longitude != null
-        ? _formatCoordinates(latitude, longitude)
-        : "Location not specified";
     final isDocumentRequest = _isDocumentRequestCategory(category);
 
     return Scaffold(
@@ -996,8 +1059,37 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             const SizedBox(height: 22),
             _buildReportDetailsHeroImage(
               imageUrl: images.isEmpty ? null : images.first,
+              imageUrls: images,
               status: status,
             ),
+            if (images.length > 1) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 62,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: images.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () => _showSwipeImageGallery(
+                        images,
+                        initialIndex: index,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          images[index],
+                          width: 82,
+                          height: 62,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Row(
               children: [
@@ -1054,17 +1146,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              _reportDetailsDescription(description, locationText),
+              _reportDetailsDescription(description),
               style: const TextStyle(
                 color: Color(0xFF424751),
                 fontSize: 16,
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 22),
-            _buildReportDetailsTimeline(status, createdAt),
-            const SizedBox(height: 18),
-            _buildOfficialUpdateCard(adminNote),
+            if (adminNote.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _buildResidentStaffNoteCard(adminNote),
+            ],
           ],
         ),
       ),
@@ -1073,48 +1165,57 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
   Widget _buildReportDetailsHeroImage({
     required String? imageUrl,
+    required List<String> imageUrls,
     required String status,
   }) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(10),
-        topRight: Radius.circular(46),
-        bottomLeft: Radius.circular(46),
-        bottomRight: Radius.circular(20),
-      ),
-      child: Stack(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 224,
-            child: imageUrl == null
-                ? Container(
-                    color: const Color(0xFFE5E7EB),
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: Color(0xFF9CA3AF),
-                      size: 44,
-                    ),
-                  )
-                : Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+    return GestureDetector(
+      onTap: imageUrl == null
+          ? null
+          : () => _showSwipeImageGallery(
+                imageUrls,
+                initialIndex: 0,
+              ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(10),
+          topRight: Radius.circular(46),
+          bottomLeft: Radius.circular(46),
+          bottomRight: Radius.circular(20),
+        ),
+        child: Stack(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 224,
+              child: imageUrl == null
+                  ? Container(
                       color: const Color(0xFFE5E7EB),
                       child: const Icon(
-                        Icons.broken_image_outlined,
+                        Icons.image_outlined,
                         color: Color(0xFF9CA3AF),
                         size: 44,
                       ),
+                    )
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFE5E7EB),
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          color: Color(0xFF9CA3AF),
+                          size: 44,
+                        ),
+                      ),
                     ),
-                  ),
-          ),
-          Positioned(
-            top: 18,
-            right: 18,
-            child: _buildReportDetailsStatusPill(status),
-          ),
-        ],
+            ),
+            Positioned(
+              top: 18,
+              right: 18,
+              child: _buildReportDetailsStatusPill(status),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1180,153 +1281,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _buildReportDetailsTimeline(String status, String? createdAt) {
-    final currentLabel = status;
-    final items = [
-      (
-        title: "Submitted",
-        subtitle: _formatTimelineDateTime(createdAt),
-        done: true,
-      ),
-      (
-        title: "Assigned to Department",
-        subtitle: _formatTimelineDateTime(createdAt),
-        done: true,
-      ),
-      (
-        title: "Site Inspected",
-        subtitle: _formatTimelineDateTime(createdAt),
-        done: status != "Pending",
-      ),
-      (
-        title: currentLabel,
-        subtitle: "${_formatTimelineDateTime(createdAt)}\nPresent",
-        done: status != "Pending",
-      ),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Status Timeline",
-            style: TextStyle(
-              color: Color(0xFF111827),
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 22),
-          ...List.generate(items.length, (index) {
-            final item = items[index];
-            final isLast = index == items.length - 1;
-            final isCurrent = item.title == currentLabel;
-            final dotColor =
-                isCurrent ? const Color(0xFFD79321) : const Color(0xFF34D399);
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      width: 17,
-                      height: 17,
-                      decoration: BoxDecoration(
-                        color: isCurrent
-                            ? const Color(0xFFFFE7B8)
-                            : const Color(0xFF83F5C6),
-                        shape: BoxShape.circle,
-                        border: isCurrent
-                            ? Border.all(color: dotColor, width: 1.2)
-                            : null,
-                      ),
-                      child: Icon(
-                        isCurrent
-                            ? Icons.circle
-                            : Icons.check_rounded,
-                        color: isCurrent
-                            ? dotColor
-                            : const Color(0xFF007151),
-                        size: isCurrent ? 7 : 11,
-                      ),
-                    ),
-                    if (!isLast)
-                      Container(
-                        width: 1,
-                        height: 64,
-                        color: const Color(0xFFE5E7EB),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          item.subtitle,
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 13,
-                            height: 1.35,
-                          ),
-                        ),
-                        if (isCurrent) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8F9FA),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              "Crew dispatched. Awaiting next update.",
-                              style: TextStyle(
-                                color: Color(0xFF6B7280),
-                                fontSize: 13,
-                                height: 1.35,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
   String _reportDetailsTitle(String category) {
     final normalized = category.toLowerCase();
     if (normalized.contains("road") || normalized.contains("pothole")) {
@@ -1343,111 +1297,50 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         text.contains("document");
   }
 
-  String _reportDetailsDescription(String description, String locationText) {
+  String _reportDetailsDescription(String description) {
     if (description == "No description provided.") {
-      return "Located precisely $locationText. No additional description was provided.";
+      return "No additional description was provided.";
     }
-    return "Located precisely $locationText. $description";
+    return description;
   }
 
-  Widget _buildOfficialUpdateCard(String adminNote) {
-    final note = adminNote.isEmpty
-        ? "No official update from the barangay admin yet."
-        : adminNote;
-
+  Widget _buildResidentStaffNoteCard(String note) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
+          Row(
+            children: const [
               Icon(
-                Icons.verified_user_rounded,
-                color: Color(0xFF0B4F94),
-                size: 15,
+                Icons.edit_note_rounded,
+                color: _brandBlue,
+                size: 18,
               ),
-              SizedBox(width: 6),
+              SizedBox(width: 8),
               Text(
-                "Official Update",
+                "Staff Note",
                 style: TextStyle(
                   color: Color(0xFF111827),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0B7A6D),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.engineering_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Engr. Mateo Santos",
-                      style: TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "District Engineer - Just now",
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              note,
-              style: const TextStyle(
-                color: Color(0xFF424751),
-                fontSize: 12,
-                height: 1.45,
-              ),
+          const SizedBox(height: 10),
+          Text(
+            note,
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              fontSize: 14,
+              height: 1.5,
             ),
           ),
         ],
@@ -1474,16 +1367,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       "Dec",
     ];
     return "${months[local.month - 1]} ${local.day}, ${local.year}";
-  }
-
-  String _formatTimelineDateTime(String? rawValue) {
-    final parsed = rawValue == null ? null : DateTime.tryParse(rawValue);
-    if (parsed == null) return "Unknown date";
-    final local = parsed.toLocal();
-    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final minute = local.minute.toString().padLeft(2, '0');
-    final period = local.hour >= 12 ? "PM" : "AM";
-    return "${_formatReportDateOnly(rawValue)}\n$hour:$minute $period";
   }
 
   String _formatAnnouncementDate(DateTime value) {
@@ -1522,11 +1405,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       } catch (_) {}
     }
 
-    if (ops.isEmpty) {
-      return _parseMarkupAnnouncementLines(rawContent);
+    if (ops.isNotEmpty) {
+      return _buildAnnouncementLinesFromOps(ops);
     }
 
-    return _buildAnnouncementLinesFromOps(ops);
+    if (trimmed.contains('<') && trimmed.contains('>')) {
+      return _parseHtmlAnnouncementLines(rawContent);
+    }
+
+    return _parseMarkupAnnouncementLines(rawContent);
   }
 
   List<_AnnouncementLine> _buildAnnouncementLinesFromOps(
@@ -1727,6 +1614,223 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return lines;
   }
 
+  List<_AnnouncementLine> _parseHtmlAnnouncementLines(String rawContent) {
+    final lines = <_AnnouncementLine>[];
+    final currentSegments = <_AnnouncementSegment>[];
+    final tagPattern = RegExp(
+      r'<\s*(\/)?([a-zA-Z0-9]+)\b([^>]*)>',
+      caseSensitive: false,
+    );
+
+    final boldStack = <bool>[];
+    final italicStack = <bool>[];
+    final underlineStack = <bool>[];
+    final strikeStack = <bool>[];
+    final sizeStack = <String?>[];
+    final colorStack = <String?>[];
+    final alignStack = <String?>[];
+
+    bool bold = false;
+    bool italic = false;
+    bool underline = false;
+    bool strike = false;
+    String? size;
+    String? color;
+    String? align;
+
+    Map<String, dynamic> currentAttributes() {
+      final attributes = <String, dynamic>{};
+      if (bold) attributes['bold'] = true;
+      if (italic) attributes['italic'] = true;
+      if (underline) attributes['underline'] = true;
+      if (strike) attributes['strike'] = true;
+      if (size != null && size.isNotEmpty) attributes['size'] = size;
+      if (color != null && color.isNotEmpty) attributes['color'] = color;
+      return attributes;
+    }
+
+    void pushLine() {
+      lines.add(
+        _AnnouncementLine(
+          segments: List<_AnnouncementSegment>.from(currentSegments),
+          align: align,
+        ),
+      );
+      currentSegments.clear();
+    }
+
+    void appendText(String text) {
+      final decoded = _decodeAnnouncementHtmlText(text);
+      final normalized = decoded.replaceAll('\r\n', '\n');
+      final parts = normalized.split('\n');
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].isNotEmpty) {
+          currentSegments.add(
+            _AnnouncementSegment(
+              text: parts[i],
+              attributes: currentAttributes(),
+            ),
+          );
+        }
+        if (i < parts.length - 1) {
+          pushLine();
+        }
+      }
+    }
+
+    var cursor = 0;
+    for (final match in tagPattern.allMatches(rawContent)) {
+      if (match.start > cursor) {
+        appendText(rawContent.substring(cursor, match.start));
+      }
+
+      final isClosing = match.group(1) == '/';
+      final tag = (match.group(2) ?? '').toLowerCase();
+      final attributesText = match.group(3) ?? '';
+      final styleText = _htmlAttributeValue(attributesText, 'style');
+      final styleAlign =
+          _htmlStyleValue(styleText, 'text-align')?.toLowerCase();
+      final styleColor = _htmlStyleValue(styleText, 'color');
+      final styleFontSize = _htmlStyleValue(styleText, 'font-size');
+
+      if (!isClosing) {
+        switch (tag) {
+          case 'strong':
+          case 'b':
+            boldStack.add(bold);
+            bold = true;
+            break;
+          case 'em':
+          case 'i':
+            italicStack.add(italic);
+            italic = true;
+            break;
+          case 'u':
+            underlineStack.add(underline);
+            underline = true;
+            break;
+          case 's':
+          case 'strike':
+            strikeStack.add(strike);
+            strike = true;
+            break;
+          case 'span':
+            colorStack.add(color);
+            sizeStack.add(size);
+            if (styleColor != null && styleColor.isNotEmpty) {
+              color = styleColor;
+            }
+            final parsedInlineSize =
+                _normalizeAnnouncementHtmlFontSize(styleFontSize);
+            if (parsedInlineSize != null) {
+              size = parsedInlineSize;
+            }
+            break;
+          case 'p':
+          case 'div':
+            alignStack.add(align);
+            if (styleAlign == 'center' ||
+                styleAlign == 'right' ||
+                styleAlign == 'justify') {
+              align = styleAlign;
+            } else if (styleAlign == 'left') {
+              align = 'left';
+            }
+            break;
+          case 'br':
+            pushLine();
+            break;
+        }
+      } else {
+        switch (tag) {
+          case 'strong':
+          case 'b':
+            bold = boldStack.isNotEmpty ? boldStack.removeLast() : false;
+            break;
+          case 'em':
+          case 'i':
+            italic = italicStack.isNotEmpty ? italicStack.removeLast() : false;
+            break;
+          case 'u':
+            underline =
+                underlineStack.isNotEmpty ? underlineStack.removeLast() : false;
+            break;
+          case 's':
+          case 'strike':
+            strike = strikeStack.isNotEmpty ? strikeStack.removeLast() : false;
+            break;
+          case 'span':
+            color = colorStack.isNotEmpty ? colorStack.removeLast() : null;
+            size = sizeStack.isNotEmpty ? sizeStack.removeLast() : null;
+            break;
+          case 'p':
+          case 'div':
+            pushLine();
+            align = alignStack.isNotEmpty ? alignStack.removeLast() : null;
+            break;
+        }
+      }
+
+      cursor = match.end;
+    }
+
+    if (cursor < rawContent.length) {
+      appendText(rawContent.substring(cursor));
+    }
+
+    if (currentSegments.isNotEmpty) {
+      pushLine();
+    }
+
+    return lines;
+  }
+
+  String _decodeAnnouncementHtmlText(String text) {
+    return text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'");
+  }
+
+  String? _htmlAttributeValue(String rawAttributes, String name) {
+    final pattern = RegExp(
+      '$name\\s*=\\s*(["\'])(.*?)\\1',
+      caseSensitive: false,
+    );
+    final match = pattern.firstMatch(rawAttributes);
+    return match?.group(2)?.trim();
+  }
+
+  String? _htmlStyleValue(String? styleText, String property) {
+    if (styleText == null || styleText.trim().isEmpty) return null;
+
+    for (final rule in styleText.split(';')) {
+      final parts = rule.split(':');
+      if (parts.length != 2) continue;
+      if (parts[0].trim().toLowerCase() == property.toLowerCase()) {
+        return parts[1].trim();
+      }
+    }
+
+    return null;
+  }
+
+  String? _normalizeAnnouncementHtmlFontSize(String? rawValue) {
+    if (rawValue == null || rawValue.trim().isEmpty) return null;
+
+    final numeric = rawValue.toLowerCase().replaceAll('px', '').trim();
+    final parsed = double.tryParse(numeric);
+    if (parsed == null) return null;
+
+    return parsed
+        .round()
+        .clamp(_minAnnouncementFontSize, _maxAnnouncementFontSize)
+        .toString();
+  }
+
   Color? _parseAnnouncementColor(dynamic value) {
     final text = value?.toString().trim() ?? '';
     if (text.isEmpty) return null;
@@ -1756,9 +1860,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     return TextStyle(
       color: _parseAnnouncementColor(attributes['color']) ??
-          const Color(0xFF505A60),
-      fontSize: fontSize ?? 14,
-      height: 1.55,
+          const Color(0xFF4F545A),
+      fontSize: fontSize ?? 15,
+      height: 1.5,
       fontWeight:
           attributes['bold'] == true ? FontWeight.w700 : FontWeight.w400,
       fontStyle:
@@ -1783,43 +1887,44 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildAnnouncementRichContent(String rawContent) {
     final lines = _parseAnnouncementLines(rawContent);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F8F9),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD8E1E4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < lines.length; index++) ...[
-              SelectableText.rich(
-                TextSpan(
-                  children: lines[index]
-                      .segments
-                      .map(
-                        (segment) => TextSpan(
-                          text: segment.text,
-                          style: _announcementSegmentStyle(segment.attributes),
-                        ),
-                      )
-                      .toList(),
-                ),
-                textAlign: _announcementTextAlign(lines[index].align),
-              ),
-              if (index != lines.length - 1) const SizedBox(height: 6),
-            ],
-            if (lines.isEmpty)
-              const Text(
-                "No announcement details available.",
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-          ],
-        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var index = 0; index < lines.length; index++) ...[
+          SelectableText.rich(
+            TextSpan(
+              children: lines[index]
+                  .segments
+                  .map(
+                    (segment) => TextSpan(
+                      text: segment.text,
+                      style: _announcementSegmentStyle(segment.attributes),
+                    ),
+                  )
+                  .toList(),
+            ),
+            textAlign: _announcementTextAlign(lines[index].align),
+          ),
+          if (index != lines.length - 1) const SizedBox(height: 8),
+        ],
+        if (lines.isEmpty)
+          const Text(
+            "No announcement details available.",
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _announcementMetaText(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF81888F),
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
       ),
     );
   }
@@ -1828,127 +1933,192 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     await _markAnnouncementsRead([announcement.id]);
     if (!mounted) return;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD1D8DC),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      announcement.title,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF203036),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatAnnouncementDate(announcement.createdAt),
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 13,
-                      ),
-                    ),
-                    if (announcement.imageUrls.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () => _showFullReportImage(
-                          announcement.thumbnailUrl.isNotEmpty
-                              ? announcement.thumbnailUrl
-                              : announcement.imageUrls.first,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            announcement.thumbnailUrl.isNotEmpty
-                                ? announcement.thumbnailUrl
-                                : announcement.imageUrls.first,
-                            width: double.infinity,
-                            height: 220,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      if (announcement.imageUrls.length > 1) ...[
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 74,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: announcement.imageUrls.length,
-                            separatorBuilder: (context, separatorIndex) =>
-                                const SizedBox(width: 8),
-                            itemBuilder: (context, index) {
-                              final imageUrl = announcement.imageUrls[index];
-                              return GestureDetector(
-                                onTap: () => _showFullReportImage(imageUrl),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    imageUrl,
-                                    width: 74,
-                                    height: 74,
-                                    fit: BoxFit.cover,
+    final imageUrls = <String>{
+      if (announcement.thumbnailUrl.trim().isNotEmpty)
+        announcement.thumbnailUrl.trim(),
+      ...announcement.imageUrls.where((url) => url.trim().isNotEmpty),
+    }.toList();
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) {
+          int selectedImageIndex = 0;
+          final pageController = PageController();
+
+          return StatefulBuilder(
+            builder: (routeContext, setRouteState) {
+              return Scaffold(
+                backgroundColor: const Color(0xFFF7F8FA),
+                body: SafeArea(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (imageUrls.isNotEmpty)
+                          AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: PageView.builder(
+                              controller: pageController,
+                              itemCount: imageUrls.length,
+                              onPageChanged: (index) {
+                                setRouteState(() {
+                                  selectedImageIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _showSwipeImageGallery(
+                                    imageUrls,
+                                    initialIndex: index,
                                   ),
+                                  child: Container(
+                                    color: const Color(0xFFE9EDF2),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        Image.network(
+                                          imageUrls[index],
+                                          width: double.infinity,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        IgnorePointer(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.bottomCenter,
+                                                end: Alignment.topCenter,
+                                                colors: [
+                                                  Color(0x66F8F9FA),
+                                                  Color(0x00F8F9FA),
+                                                ],
+                                                stops: [0.0, 1.0],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        else
+                          Container(
+                            height: 210,
+                            width: double.infinity,
+                            color: const Color(0xFFE9EDF2),
+                            child: const Icon(
+                              Icons.campaign_outlined,
+                              color: Color(0xFF94A3B8),
+                              size: 42,
+                            ),
+                          ),
+                        if (imageUrls.length > 1)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                            child: SizedBox(
+                              height: 56,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: imageUrls.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final isSelected =
+                                      selectedImageIndex == index;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      pageController.animateToPage(
+                                        index,
+                                        duration:
+                                            const Duration(milliseconds: 220),
+                                        curve: Curves.easeOut,
+                                      );
+                                      setRouteState(() {
+                                        selectedImageIndex = index;
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 160),
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? _brandBlue
+                                              : const Color(0xFFE2E8F0),
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(
+                                          imageUrls[index],
+                                          width: 76,
+                                          height: 52,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                announcement.title.trim().isEmpty
+                                    ? "Barangay Update"
+                                    : announcement.title.trim(),
+                                style: const TextStyle(
+                                  color: Color(0xFF2C2F32),
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.16,
                                 ),
-                              );
-                            },
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  _announcementMetaText(
+                                    _announcementCreatorLabel(announcement),
+                                  ),
+                                  const SizedBox(width: 32),
+                                  _announcementMetaText(
+                                    _formatAnnouncementDate(
+                                      announcement.createdAt,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: Color(0xFFE2E5E9),
+                              ),
+                              const SizedBox(height: 14),
+                              _buildAnnouncementRichContent(
+                                announcement.content,
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ],
-                    const SizedBox(height: 16),
-                    _buildAnnouncementRichContent(announcement.content),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _teal,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          "Close",
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -1960,91 +2130,325 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: _pageBackground,
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          "Notifications",
-                          style: TextStyle(
-                            color: _brandBlue,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      IgnorePointer(
-                        child: _buildTopActionButton(
-                          onTap: () {},
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    children: [
-                      const Text(
-                        "Notifications",
-                        style: TextStyle(
-                          color: _brandBlue,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          height: 1.05,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Stay updated with community alerts and local news.",
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      if (_isLoadingAnnouncements)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (_announcements.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
+        builder: (_) => StatefulBuilder(
+          builder: (routeContext, setRouteState) {
+            final filteredAnnouncements = _selectedAnnouncementFilter == "All"
+                ? _announcements
+                : _announcements.where(
+                    (announcement) {
+                      final category = _announcementListCategory(announcement);
+                      return _selectedAnnouncementFilter == "Communication"
+                          ? category == "Community"
+                          : category == _selectedAnnouncementFilter;
+                    },
+                  ).toList();
+
+            return Scaffold(
+              backgroundColor: _pageBackground,
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              "Announcement",
+                              style: TextStyle(
+                                color: _brandBlue,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                          child: const Text(
-                            "No announcements yet.",
-                            style: TextStyle(color: Color(0xFF64748B)),
-                          ),
-                        )
-                      else
-                        ...List.generate(_announcements.length, (index) {
-                          return _buildNotificationCard(
-                            _announcements[index],
-                            emphasized: index == 0 &&
-                                _announcementShouldHighlight(
-                                  _announcements[index],
-                                ),
+                          _buildTopActionButton(onTap: () {}),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _announcementFilters.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final filter = _announcementFilters[index];
+                          return _buildAnnouncementFilterChip(
+                            label: filter,
+                            isSelected: _selectedAnnouncementFilter == filter,
+                            onTap: () {
+                              setRouteState(() {
+                                _selectedAnnouncementFilter = filter;
+                              });
+                            },
                           );
-                        }),
-                    ],
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: _isLoadingAnnouncements
+                          ? const Center(child: CircularProgressIndicator())
+                          : filteredAnnouncements.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    "No announcements yet.",
+                                    style: TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                                  itemCount: filteredAnnouncements.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 14),
+                                  itemBuilder: (context, index) {
+                                    return _buildAnnouncementListCard(
+                                      filteredAnnouncements[index],
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showSwipeImageGallery(
+    List<String> imageUrls, {
+    int initialIndex = 0,
+  }) {
+    if (imageUrls.isEmpty) return;
+    final controller = PageController(initialPage: initialIndex);
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialogContext) {
+        return Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: SafeArea(
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: controller,
+                  itemCount: imageUrls.length,
+                  itemBuilder: (context, index) {
+                    return InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 5,
+                      child: Center(
+                        child: Image.network(
+                          imageUrls[index],
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<String> get _announcementFilters => const [
+        "All",
+        "Emergency",
+        "Health",
+        "Communication",
+      ];
+
+  String _announcementListCategory(Announcement announcement) {
+    final haystack =
+        "${announcement.title} ${announcement.content}".toLowerCase();
+    if (haystack.contains("emergency") ||
+        haystack.contains("urgent") ||
+        haystack.contains("flood") ||
+        haystack.contains("storm") ||
+        haystack.contains("warning")) {
+      return "Emergency";
+    }
+    if (haystack.contains("health") ||
+        haystack.contains("medical") ||
+        haystack.contains("consultation") ||
+        haystack.contains("clinic")) {
+      return "Health";
+    }
+    return "Community";
+  }
+
+  Color _announcementCategoryBackground(String category) {
+    switch (category) {
+      case "Emergency":
+        return const Color(0xFFFFE5E8);
+      case "Health":
+        return const Color(0xFFA7F3D0);
+      default:
+        return const Color(0xFFDCEAFE);
+    }
+  }
+
+  Color _announcementCategoryTextColor(String category) {
+    switch (category) {
+      case "Emergency":
+        return const Color(0xFFE11D48);
+      case "Health":
+        return const Color(0xFF047857);
+      default:
+        return const Color(0xFF1D4ED8);
+    }
+  }
+
+  Widget _buildAnnouncementFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? _brandBlue : const Color(0xFFEDEFF1),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF4B5563),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementListCard(Announcement announcement) {
+    final category = _announcementListCategory(announcement);
+    final preview = _plainAnnouncementPreview(announcement);
+    final trimmedPreview =
+        preview.length > 86 ? "${preview.substring(0, 86)}..." : preview;
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: () => _runAfterTapFeedback(
+          () => _showAnnouncementDetails(announcement),
+        ),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08000000),
+                blurRadius: 16,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _announcementCategoryBackground(category),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      category.toUpperCase(),
+                      style: TextStyle(
+                        color: _announcementCategoryTextColor(category),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatAnnouncementDate(announcement.createdAt),
+                    style: const TextStyle(
+                      color: Color(0xFF4B5563),
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                announcement.title.trim().isEmpty
+                    ? "Barangay Update"
+                    : announcement.title.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF17181C),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                trimmedPreview,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF4B5563),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Read more ->",
+                style: TextStyle(
+                  color: _brandBlue,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2080,22 +2484,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return "${months[local.month - 1]} ${local.day}, ${local.year}";
   }
 
-  String _formatNotificationTime(DateTime value) {
-    final difference = DateTime.now().difference(value.toLocal());
-    if (difference.inMinutes < 1) {
-      return "Just now";
-    }
-    if (difference.inMinutes < 60) {
-      final minutes = difference.inMinutes;
-      return "$minutes min${minutes == 1 ? '' : 's'} ago";
-    }
-    if (difference.inHours < 24) {
-      final hours = difference.inHours;
-      return "$hours hr${hours == 1 ? '' : 's'} ago";
-    }
-    return _formatLongDate(value.toIso8601String());
-  }
-
   String _plainAnnouncementPreview(Announcement announcement) {
     final lines = _parseAnnouncementLines(announcement.content);
     final text = lines
@@ -2113,17 +2501,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return "${text.substring(0, 117)}...";
   }
 
-  bool _announcementShouldHighlight(Announcement announcement) {
-    final haystack =
-        "${announcement.title} ${announcement.content}".toLowerCase();
-    return haystack.contains("severe") ||
-        haystack.contains("weather") ||
-        haystack.contains("storm") ||
-        haystack.contains("flood") ||
-        haystack.contains("warning") ||
-        haystack.contains("urgent");
-  }
-
   String _announcementBadgeLabel(Announcement announcement) {
     final haystack =
         "${announcement.title} ${announcement.content}".toLowerCase();
@@ -2139,117 +2516,372 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return "COMMUNITY ALERT";
   }
 
-  Widget _buildNotificationCard(
-    Announcement announcement, {
-    required bool emphasized,
-  }) {
-    final cardColor = emphasized ? const Color(0xFF9C0012) : Colors.white;
-    final borderColor =
-        emphasized ? Colors.transparent : const Color(0xFFE5EAF1);
-    final titleColor = emphasized ? Colors.white : const Color(0xFF1F2937);
-    final bodyColor =
-        emphasized ? const Color(0xFFFCE7EA) : const Color(0xFF475569);
-    final metaColor =
-        emphasized ? const Color(0xFFFDE6EA) : const Color(0xFF64748B);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-        boxShadow: emphasized
-            ? const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 8),
-                ),
-              ]
-            : null,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => _runAfterTapFeedback(
-          () => _showAnnouncementDetails(announcement),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: emphasized
-                          ? const Color(0xFF7F000F)
-                          : const Color(0xFFFFEEE8),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      _announcementBadgeLabel(announcement),
-                      style: TextStyle(
-                        color:
-                            emphasized ? Colors.white : const Color(0xFFF0643B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatNotificationTime(announcement.createdAt),
-                    style: TextStyle(
-                      color: metaColor,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                announcement.title.trim().isEmpty
-                    ? "Barangay Notification"
-                    : announcement.title,
-                style: TextStyle(
-                  color: titleColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _plainAnnouncementPreview(announcement),
-                style: TextStyle(
-                  color: bodyColor,
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _openServiceView(_ResidentServiceView view) {
     setState(() {
       _currentTab = 1;
       _serviceView = view;
+      if (view != _ResidentServiceView.certificateRequestForm) {
+        _selectedCertificateRequest = null;
+      }
     });
+  }
+
+  void _openCertificateRequestForm(Map<String, dynamic> certificate) {
+    _populateCertificateFormDefaults();
+    setState(() {
+      _selectedCertificateRequest = certificate;
+      _selectedCertificatePaymentMethod = "GCash";
+      _selectedCertificateVariant = "Good Moral";
+      _serviceView = _ResidentServiceView.certificateRequestForm;
+    });
+  }
+
+  void _populateCertificateFormDefaults() {
+    _certificateControllers['full_name']!.text = _fullName;
+    _certificateControllers['address']!.text =
+        _address == "Address not set" ? "" : _address;
+    _certificateControllers['contact_number']!.text =
+        _contactNumber == "No contact number" ? "" : _contactNumber;
+    _certificateControllers['email']!.text =
+        _supabase.auth.currentUser?.email?.trim() ?? "";
+  }
+
+  void _resetCertificateRequestForm() {
+    for (final entry in _certificateControllers.entries) {
+      final keepAutoFilled = entry.key == 'full_name' ||
+          entry.key == 'address' ||
+          entry.key == 'contact_number' ||
+          entry.key == 'email';
+      if (!keepAutoFilled) {
+        entry.value.clear();
+      }
+    }
+    _selectedCertificatePaymentMethod = "GCash";
+    _selectedCertificateVariant = "Good Moral";
+    _selectedPaymentProofImage = null;
+  }
+
+  bool _validateCertificateRequest() {
+    final requiredLabels = <String, String>{
+      'full_name': 'Full Name',
+      'address': 'Address',
+      'contact_number': 'Contact Number',
+      'purpose': 'Purpose of Request',
+    };
+
+    for (final entry in requiredLabels.entries) {
+      if (_certificateControllers[entry.key]!.text.trim().isEmpty) {
+        _showSnackBar("Please enter ${entry.value}.");
+        return false;
+      }
+    }
+
+    final certificateKey = _selectedCertificateRequest?['key'] as String? ?? '';
+    final certificateSpecificRequired = switch (certificateKey) {
+      'certificate_of_indigency' => <String, String>{
+          'institution_agency': 'Name of Institution / Agency',
+          'reason_for_request': 'Reason for Request',
+        },
+      'good_moral_residency' => <String, String>{
+          'length_of_stay': 'Length of Stay in Barangay',
+          'institution_agency': 'Name of School / Employer / Agency',
+        },
+      'barangay_clearance_for_loan' => <String, String>{
+          'loan_purpose': 'Loan Purpose',
+          'lending_company': 'Name of Lending Company / Bank',
+          'loan_amount': 'Amount to be Borrowed',
+          'length_of_stay': 'Length of Stay in Barangay',
+        },
+      'barangay_id' => <String, String>{
+          'gender': 'Gender',
+          'occupation': 'Occupation',
+          'emergency_contact_name': 'Emergency Contact Name',
+          'emergency_contact_number': 'Emergency Contact Number',
+        },
+      'special_certification' => <String, String>{
+          'certification_details': 'Details of Certification Needed',
+          'requesting_party': 'Name of Agency / Person Requesting It',
+        },
+      'store_business_clearance' => <String, String>{
+          'business_name': 'Business Name',
+          'business_address': 'Business Address',
+          'business_type': 'Type of Business',
+          'years_of_operation': 'Years of Operation',
+        },
+      'tricycle_clearance' => <String, String>{
+          'operator_name': 'Driver / Operator Name',
+          'plate_number': 'Tricycle Plate Number',
+          'route_area': 'Route / Area of Operation',
+        },
+      'banca_clearance' => <String, String>{
+          'operator_name': 'Owner / Operator Name',
+          'banca_name': 'Banca Name',
+          'banca_registration_number': 'Banca Registration Number',
+          'operation_area': 'Area of Operation',
+        },
+      _ => <String, String>{},
+    };
+
+    for (final entry in certificateSpecificRequired.entries) {
+      if (_certificateControllers[entry.key]!.text.trim().isEmpty) {
+        _showSnackBar("Please enter ${entry.value}.");
+        return false;
+      }
+    }
+
+    if (_selectedCertificatePaymentMethod == "GCash") {
+      if (_certificateControllers['payment_reference']!.text.trim().isEmpty) {
+        _showSnackBar("Please enter the GCash reference number.");
+        return false;
+      }
+      if (_selectedPaymentProofImage == null) {
+        _showSnackBar("Please upload your payment proof screenshot.");
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Map<String, dynamic> _buildCertificateRequestPayload(
+    Map<String, dynamic> certificate,
+    User user, {
+    String? paymentProofUrl,
+  }) {
+    final sanitizedFormData = <String, dynamic>{};
+
+    for (final entry in _certificateControllers.entries) {
+      final value = entry.value.text.trim();
+      if (value.isNotEmpty) {
+        sanitizedFormData[entry.key] = value;
+      }
+    }
+
+    final feeLabel = certificate['fee'] as String? ?? 'Free';
+
+    return {
+      'user_id': user.id,
+      'resident_id': user.id,
+      'resident_name':
+          _certificateControllers['full_name']!.text.trim().isNotEmpty
+              ? _certificateControllers['full_name']!.text.trim()
+              : _fullName,
+      'certificate_key': certificate['key'] as String? ?? '',
+      'certificate_title': certificate['title'] as String? ?? 'Document Request',
+      'certificate_variant':
+          certificate['key'] == 'good_moral_residency'
+              ? _selectedCertificateVariant
+              : null,
+      'contact_number': _certificateControllers['contact_number']!.text.trim(),
+      'email': _certificateControllers['email']!.text.trim(),
+      'address': _certificateControllers['address']!.text.trim(),
+      'payment_method': _selectedCertificatePaymentMethod,
+      'payment_receiver_name':
+          _selectedCertificatePaymentMethod == 'GCash'
+              ? _demoGcashReceiverName
+              : null,
+      'payment_receiver_number':
+          _selectedCertificatePaymentMethod == 'GCash'
+              ? _demoGcashReceiverNumber
+              : null,
+      'payment_reference':
+          _selectedCertificatePaymentMethod == 'GCash'
+              ? _certificateControllers['payment_reference']!.text.trim()
+              : null,
+      'payment_proof_url': paymentProofUrl,
+      'payment_submitted_at':
+          _selectedCertificatePaymentMethod == 'GCash'
+              ? DateTime.now().toIso8601String()
+              : null,
+      'fee_label': feeLabel,
+      'fee_amount': _parseCertificateFeeAmount(feeLabel),
+      'purpose': _certificateControllers['purpose']!.text.trim(),
+      'additional_notes':
+          _certificateControllers['additional_notes']!.text.trim().isEmpty
+              ? null
+              : _certificateControllers['additional_notes']!.text.trim(),
+      'form_data': sanitizedFormData,
+      'status':
+          _selectedCertificatePaymentMethod == 'GCash'
+              ? 'awaiting_payment'
+              : 'pending',
+    };
+  }
+
+  Future<void> _pickPaymentProofImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _selectedPaymentProofImage = File(picked.path);
+    });
+  }
+
+  Future<String?> _uploadPaymentProofImage(File imageFile) async {
+    try {
+      final fileName = path.basename(imageFile.path);
+      final userId = _supabase.auth.currentUser!.id;
+      final filePath =
+          "document-payment-proofs/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName";
+
+      await _supabase.storage.from('resident-files').upload(
+        filePath,
+        imageFile,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      return _supabase.storage.from('resident-files').getPublicUrl(filePath);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double _parseCertificateFeeAmount(String feeLabel) {
+    final normalizedFee = feeLabel.toLowerCase();
+    if (normalizedFee.contains('free')) return 0;
+
+    final digitsOnly = feeLabel.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(digitsOnly) ?? 0;
+  }
+
+  Future<void> _submitCertificateRequestForm() async {
+    if (!_validateCertificateRequest()) return;
+
+    final user = _supabase.auth.currentUser;
+    final certificate = _selectedCertificateRequest;
+
+    if (user == null || certificate == null) {
+      _showSnackBar("Unable to submit the request right now.");
+      return;
+    }
+
+    setState(() => _isSubmittingCertificateRequest = true);
+
+    try {
+      String? paymentProofUrl;
+      if (_selectedCertificatePaymentMethod == 'GCash' &&
+          _selectedPaymentProofImage != null) {
+        paymentProofUrl =
+            await _uploadPaymentProofImage(_selectedPaymentProofImage!);
+
+        if (paymentProofUrl == null) {
+          throw Exception('Payment proof upload failed');
+        }
+      }
+
+      final payload = _buildCertificateRequestPayload(
+        certificate,
+        user,
+        paymentProofUrl: paymentProofUrl,
+      );
+
+      await _supabase.from('document_requests').insert(payload);
+
+      if (!mounted) return;
+
+      final certificateTitle =
+          certificate['title'] as String? ?? 'Document Request';
+      await _fetchResidentActivity();
+      await _showCertificateRequestSubmittedDialog(certificateTitle);
+    } on PostgrestException {
+      if (!mounted) return;
+      _showSnackBar("Unable to submit the request right now.");
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar(
+        "We couldn't submit your request right now. Please try again.",
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingCertificateRequest = false);
+      }
+    }
+  }
+
+  Future<void> _showCertificateRequestSubmittedDialog(
+    String certificateTitle,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Request Submitted',
+                  style: TextStyle(
+                    color: _brandBlue,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Your $certificateTitle request has been submitted successfully. Please wait for barangay staff to review your request and payment details.',
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      setState(() {
+                        _resetCertificateRequestForm();
+                        _selectedCertificateRequest = null;
+                        _serviceView = _ResidentServiceView.menu;
+                        _currentTab = 2;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _brandBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _onDestinationSelected(int index) {
     setState(() {
       _currentTab = index;
+      _selectedCertificateRequest = null;
       if (index == 1) {
         _serviceView = _ResidentServiceView.menu;
       }
@@ -2259,16 +2891,23 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Future<void> _showCategorySheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
         return SafeArea(
           child: Container(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * 0.82,
+            ),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+              padding: EdgeInsets.fromLTRB(18, 18, 18, 24 + bottomInset),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2293,61 +2932,68 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  ..._categories.map((category) {
-                    final selected = category == _selectedCategory;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            Navigator.pop(context);
-                            setState(() => _selectedCategory = category);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFFF4F8FD)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: selected
-                                    ? _brandBlue
-                                    : const Color(0xFFE4E9F1),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    category,
-                                    style: TextStyle(
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _categories.map((category) {
+                          final selected = category == _selectedCategory;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  setState(() => _selectedCategory = category);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? const Color(0xFFF4F8FD)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
                                       color: selected
                                           ? _brandBlue
-                                          : const Color(0xFF2B3B4D),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
+                                          : const Color(0xFFE4E9F1),
                                     ),
                                   ),
-                                ),
-                                if (selected)
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    color: _brandBlue,
-                                    size: 20,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          category,
+                                          style: TextStyle(
+                                            color: selected
+                                                ? _brandBlue
+                                                : const Color(0xFF2B3B4D),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ),
+                                      if (selected)
+                                        const Icon(
+                                          Icons.check_rounded,
+                                          color: _brandBlue,
+                                          size: 20,
+                                        ),
+                                    ],
                                   ),
-                              ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2406,14 +3052,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         Expanded(
           child: Text(
             title,
-            style: TextStyle(
-              color: title == "Announcement"
-                  ? const Color(0xFF424751)
-                  : const Color(0xFF344250),
-              fontSize: title == "Announcement" ? 20 : 22,
-              fontWeight: title == "Announcement"
-                  ? FontWeight.w500
-                  : FontWeight.w700,
+            style: const TextStyle(
+              color: Color(0xFF424751),
+              fontSize: 18,
+              height: 28 / 18,
+              letterSpacing: 0,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -2536,10 +3180,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0x00000000),
-                  Color(0xCC000000),
+                  Color(0x00001E40),
+                  Color(0x33001E40),
+                  Color(0xE6001E40),
                 ],
-                stops: [0.36, 1],
+                stops: [0.0, 0.5, 1.0],
               ),
             ),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -2570,14 +3215,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  item.title.trim().isEmpty ? "Barangay Update" : item.title.trim(),
+                  item.title.trim().isEmpty
+                      ? "Barangay Update"
+                      : item.title.trim(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
-                    height: 1.05,
+                  style: GoogleFonts.publicSans(
+                    color: const Color(0xFFFFFFFF),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    height: 22.5 / 18,
+                    letterSpacing: 0,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -2585,10 +3233,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFE2E8F0),
+                  style: GoogleFonts.inter(
+                    color: const Color(0xCCFFFFFF),
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
+                    height: 16 / 14,
+                    letterSpacing: 0,
                   ),
                 ),
               ],
@@ -2602,6 +3252,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildQuickActionCard({
     required Color accent,
     required Color bg,
+    Color borderColor = const Color(0xFFE2E8F0),
     required IconData icon,
     required String title,
     required String subtitle,
@@ -2617,18 +3268,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: accent,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: Colors.white, size: 36),
+                child: Icon(icon, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -2643,12 +3294,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: const TextStyle(
                         color: Color(0xFF3F3F46),
                         fontSize: 14,
+                        height: 1.15,
                       ),
                     ),
                   ],
@@ -2843,7 +3494,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ),
             Container(
               width: double.infinity,
-              color: _brandBlue,
+              color: Color(0xFF006CBF),
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
               child: const Text(
                 "Stay updated with the latest community news and access essential barangay services.",
@@ -2878,7 +3529,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       onRefresh: () async {
         await Future.wait([
           _loadResidentProfile(),
-          _fetchMyReports(),
+          _fetchResidentActivity(),
           _fetchAnnouncements(),
         ]);
       },
@@ -2903,15 +3554,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Quick Actions",
                   style: TextStyle(
-                    color: Color(0xFF344250),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF424751),
+                    fontSize: 18,
+                    height: 28 / 18,
+                    letterSpacing: 0,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 12),
                 _buildQuickActionCard(
                   accent: _gold,
-                  bg: const Color(0xFFFFFAEF),
+                  bg: const Color(0x80F8EEDF),
+                  borderColor: const Color(0x33E8A508),
                   icon: Icons.campaign_outlined,
                   title: "File a report",
                   subtitle: "Report a community problem",
@@ -2921,7 +3575,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const SizedBox(height: 12),
                 _buildQuickActionCard(
                   accent: const Color(0xFF0D8B83),
-                  bg: const Color(0xFFF2FBFA),
+                  bg: const Color(0x80E7EFEE),
+                  borderColor: const Color(0xFFC0DCD9),
                   icon: Icons.description_outlined,
                   title: "Request document",
                   subtitle: "Apply for certificates",
@@ -2933,7 +3588,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   "Ongoing Services",
                   style: TextStyle(
                     color: Color(0xFF424751),
-                    fontSize: 19,
+                    fontSize: 18,
+                    height: 28 / 18,
+                    letterSpacing: 0,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2988,7 +3645,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   "Recent Activity",
                   style: TextStyle(
                     color: Color(0xFF424751),
-                    fontSize: 19,
+                    fontSize: 18,
+                    height: 28 / 18,
+                    letterSpacing: 0,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -3064,6 +3723,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required String title,
     required String subtitle,
     bool allowBackToMenu = false,
+    VoidCallback? onBack,
   }) {
     return SafeArea(
       bottom: false,
@@ -3081,17 +3741,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               children: [
                 GestureDetector(
                   onTap: allowBackToMenu
-                      ? () {
-                          setState(() {
-                            _serviceView = _ResidentServiceView.menu;
-                          });
-                        }
+                      ? (onBack ??
+                          () {
+                            setState(() {
+                              _serviceView = _ResidentServiceView.menu;
+                            });
+                          })
                       : null,
                   child: Text(
                     sectionLabel,
                     style: TextStyle(
                       color: _brandBlue,
-                      fontSize: 14,
+                      fontSize: 18,
                       fontWeight:
                           allowBackToMenu ? FontWeight.w700 : FontWeight.w600,
                     ),
@@ -3424,35 +4085,35 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               children: [
                 _buildServiceEntryCard(
                   accent: _gold,
-                  background: const Color(0xFFFFF7E6),
-                  borderColor: const Color(0xFFFFDC8A),
+                  background: const Color(0x80F8EEDF),
+                  borderColor: const Color(0x33E8A508),
                   icon: Icons.campaign_outlined,
                   title: "File a Report",
                   description:
-                      "Report emergencies, infrastructure issues, or community concerns directly.",
-                cta: "PROCEED",
-                onTap: () {
-                  setState(() {
-                    _serviceView = _ResidentServiceView.reportForm;
-                  });
-                },
-              ),
+                      "Report non-emergency infrastructure issues or community concerns directly.",
+                  cta: "PROCEED",
+                  onTap: () {
+                    setState(() {
+                      _serviceView = _ResidentServiceView.reportForm;
+                    });
+                  },
+                ),
                 const SizedBox(height: 20),
                 _buildServiceEntryCard(
                   accent: const Color(0xFF0D8B83),
-                  background: const Color(0xFFEAFBF4),
-                  borderColor: const Color(0xFFB7E6DB),
+                  background: const Color(0x80E7EFEE),
+                  borderColor: const Color(0xFFC0DCD9),
                   icon: Icons.description_outlined,
-                  title: "Request Document",
+                  title: "Request Certificate",
                   description:
                       "Apply for Barangay Clearance, Residency, and other official documents.",
-                cta: "APPLY NOW",
-                onTap: () {
-                  setState(() {
-                    _serviceView = _ResidentServiceView.certificates;
-                  });
-                },
-              ),
+                  cta: "APPLY NOW",
+                  onTap: () {
+                    setState(() {
+                      _serviceView = _ResidentServiceView.certificates;
+                    });
+                  },
+                ),
               ],
             ),
           ),
@@ -3662,24 +4323,429 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
+  Widget _buildDocumentRequestDetailsPage(Map<String, dynamic> request) {
+    final certificateTitle =
+        (request['certificate_title']?.toString().trim().isNotEmpty ?? false)
+            ? request['certificate_title'].toString().trim()
+            : "Document Request";
+    final certificateVariant =
+        request['certificate_variant']?.toString().trim() ?? '';
+    final status = request['status']?.toString() ?? 'pending';
+    final statusLabel = _statusLabel(status);
+    final paymentMethod = request['payment_method']?.toString().trim() ?? '';
+    final paymentReceiverName =
+        request['payment_receiver_name']?.toString().trim() ?? '';
+    final paymentReceiverNumber =
+        request['payment_receiver_number']?.toString().trim() ?? '';
+    final paymentReference =
+        request['payment_reference']?.toString().trim() ?? '';
+    final paymentProofUrl =
+        request['payment_proof_url']?.toString().trim() ?? '';
+    final feeLabel = request['fee_label']?.toString().trim() ?? '';
+    final purpose = request['purpose']?.toString().trim() ?? '';
+    final additionalNotes =
+        request['additional_notes']?.toString().trim() ?? '';
+    final rejectionReason =
+        request['rejection_reason']?.toString().trim() ?? '';
+    final createdAt = request['created_at']?.toString();
+    final rawFormData = request['form_data'];
+    final formData = rawFormData is Map
+        ? Map<String, dynamic>.from(rawFormData)
+        : <String, dynamic>{};
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF0B4F94),
+                    size: 18,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Document Request Details",
+                    style: TextStyle(
+                      color: Color(0xFF0B4F94),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x12000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEAF3FF),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.description_outlined,
+                          color: Color(0xFF0B4F94),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              certificateVariant.isNotEmpty
+                                  ? "$certificateTitle ($certificateVariant)"
+                                  : certificateTitle,
+                              style: const TextStyle(
+                                color: Color(0xFF1F2937),
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildResidentStatusChip(statusLabel),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildReportDetailsMetaChip(
+                        icon: Icons.schedule_outlined,
+                        label: _formatDetailedReportDate(createdAt),
+                      ),
+                      if (paymentMethod.isNotEmpty)
+                        _buildReportDetailsMetaChip(
+                          icon: Icons.payments_outlined,
+                          label: paymentMethod,
+                        ),
+                      if (feeLabel.isNotEmpty)
+                        _buildReportDetailsMetaChip(
+                          icon: Icons.receipt_long_outlined,
+                          label: feeLabel,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  _buildDocumentDetailSection(
+                    title: "Purpose of Request",
+                    body: purpose.isEmpty ? "No purpose provided." : purpose,
+                  ),
+                  if (paymentMethod.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    _buildDocumentFieldRow(
+                      label: "Payment Method",
+                      value: paymentMethod,
+                    ),
+                  ],
+                  if (paymentReceiverName.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildDocumentFieldRow(
+                      label: "Receiver Name",
+                      value: paymentReceiverName,
+                    ),
+                  ],
+                  if (paymentReceiverNumber.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildDocumentFieldRow(
+                      label: "Receiver Number",
+                      value: paymentReceiverNumber,
+                    ),
+                  ],
+                  if (paymentReference.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildDocumentFieldRow(
+                      label: "Payment Reference",
+                      value: paymentReference,
+                    ),
+                  ],
+                  if (paymentProofUrl.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    _buildDocumentPaymentProofCard(paymentProofUrl),
+                  ],
+                  if (additionalNotes.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    _buildDocumentDetailSection(
+                      title: "Additional Notes",
+                      body: additionalNotes,
+                    ),
+                  ],
+                  if (rejectionReason.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    _buildDocumentDetailSection(
+                      title: "Rejection Reason",
+                      body: rejectionReason,
+                      backgroundColor: const Color(0xFFFFF1F2),
+                      borderColor: const Color(0xFFFECDD3),
+                    ),
+                  ],
+                  if (formData.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    const Text(
+                      "Submitted Information",
+                      style: TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ...formData.entries.map((entry) {
+                      final value = entry.value?.toString().trim() ?? '';
+                      if (value.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildDocumentFieldRow(
+                          label: _humanizeRequestFieldLabel(entry.key),
+                          value: value,
+                        ),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildDocumentFieldRow(
+                    label: "Request ID",
+                    value: request['id']?.toString() ?? 'Unavailable',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResidentStatusChip(String statusLabel) {
+    final statusStyle = _statusChipStyle(statusLabel);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: statusStyle.bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        statusLabel.toUpperCase(),
+        style: TextStyle(
+          color: statusStyle.text,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentDetailSection({
+    required String title,
+    required String body,
+    Color backgroundColor = const Color(0xFFF8FAFC),
+    Color borderColor = const Color(0xFFE2E8F0),
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: const TextStyle(
+              color: Color(0xFF475569),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentFieldRow({
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF1F2937),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentPaymentProofCard(String imageUrl) {
+    return GestureDetector(
+      onTap: () => _showSwipeImageGallery([imageUrl], initialIndex: 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFFFF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Payment Proof",
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                imageUrl,
+                height: 190,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 190,
+                  color: const Color(0xFFF8FAFC),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: Color(0xFF94A3B8),
+                    size: 38,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "Tap to view screenshot",
+              style: TextStyle(
+                color: _brandBlue,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _humanizeRequestFieldLabel(String key) {
+    return key
+        .split('_')
+        .map((part) {
+          if (part.isEmpty) return part;
+          return part[0].toUpperCase() + part.substring(1);
+        })
+        .join(' ');
+  }
+
   Widget _buildRequestCard(Map<String, dynamic> report) {
+    final isDocumentRequest = report['activity_type'] == 'document_request';
     final status = (report['status'] as String?) ?? "pending";
     final statusLabel = _statusLabel(status).toUpperCase();
+    final statusChipStyle = _statusChipStyle(status);
     final normalizedStatus = status.toLowerCase();
-    final statusChipStyle =
-        (normalizedStatus == "in_process" || normalizedStatus == "in progress")
-            ? (bg: const Color(0xFFDBEAFE), text: const Color(0xFF1E40AF))
-            : (normalizedStatus == "completed" || normalizedStatus == "resolved")
-                ? (bg: const Color(0xFFD1FAE5), text: const Color(0xFF065F46))
-                : (bg: const Color(0xFFFEF3C7), text: const Color(0xFFD79321));
     final category = (report['category'] as String?)?.trim();
-    final title = (category != null && category.isNotEmpty)
-        ? category
-        : "Community concern";
-    final subtitle = "Status change to ${_statusLabel(status).toLowerCase()}";
-    final iconData =
-        normalizedStatus == "completed" || normalizedStatus == "resolved"
-            ? Icons.description_outlined
+    final certificateTitle = (report['certificate_title'] as String?)
+        ?.trim();
+    final certificateVariant = (report['certificate_variant'] as String?)
+        ?.trim();
+    final title = isDocumentRequest
+        ? ((certificateTitle != null && certificateTitle.isNotEmpty)
+            ? (certificateVariant != null && certificateVariant.isNotEmpty
+                ? "$certificateTitle ($certificateVariant)"
+                : certificateTitle)
+            : "Document request")
+        : (category != null && category.isNotEmpty)
+            ? category
+            : "Community concern";
+    final subtitle = isDocumentRequest
+        ? "Document request is ${_statusLabel(status).toLowerCase()}"
+        : "Status change to ${_statusLabel(status).toLowerCase()}";
+    final iconData = isDocumentRequest
+        ? Icons.description_outlined
+        : normalizedStatus == "completed" || normalizedStatus == "resolved"
+            ? Icons.task_alt_outlined
             : Icons.campaign_outlined;
 
     return Container(
@@ -3692,7 +4758,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => _runAfterTapFeedback(
-          () => _showReportDetails(report),
+          () => isDocumentRequest
+              ? _showDocumentRequestDetails(report)
+              : _showReportDetails(report),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -3804,125 +4872,770 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         _buildServicesTopBar(
           sectionLabel: "Services",
           title: "Request Document",
-          subtitle:
-              "Secure your official barangay certifications and permits online. Fast, efficient, and direct.",
+          subtitle: "Choose the certificate or permit you need.",
           allowBackToMenu: true,
         ),
+        const SizedBox(height: 8),
+        ..._certificateOptions.map(_buildCertificateOptionCard),
         const SizedBox(height: 12),
-        ..._certificateOptions.map((item) {
-          final price = item['price'] ?? '';
-          final isFree = price.toUpperCase() == 'FREE';
-          return Container(
-            margin: const EdgeInsets.fromLTRB(
-              _pageHorizontalPadding,
-              0,
-              _pageHorizontalPadding,
-              12,
-            ),
-            padding: const EdgeInsets.all(16),
+      ],
+    );
+  }
+
+  Widget _buildCertificateOptionCard(Map<String, dynamic> item) {
+    final title = item['title'] as String? ?? '';
+    final description = item['description'] as String? ?? '';
+    final fee = item['fee'] as String? ?? '';
+    final icon = item['icon'] as IconData? ?? Icons.description_outlined;
+    final accent = item['accent'] as Color? ?? _brandBlue;
+    final background = item['background'] as Color? ?? _softBlue;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        _pageHorizontalPadding,
+        0,
+        _pageHorizontalPadding,
+        10,
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: () => _runAfterTapFeedback(
+            () => _openCertificateRequestForm(item),
+          ),
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE9EDF2)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A101828),
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item['title'] ?? '',
-                        style: const TextStyle(
-                          color: Color(0xFF1F2937),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: background,
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      price,
-                      style: TextStyle(
-                        color: isFree ? const Color(0xFFD4263A) : _brandBlue,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
+                    child: Icon(icon, color: accent, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Color(0xFF2A2F35),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            color: Color(0xFF667085),
+                            fontSize: 12.5,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fee,
+                          style: const TextStyle(
+                            color: Color(0xFF2A2F35),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF98A2B3),
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCertificateRequestFormTab() {
+    final certificate = _selectedCertificateRequest;
+    if (certificate == null) {
+      return _buildCertificatesTab();
+    }
+
+    final title = certificate['title'] as String? ?? 'Document Request';
+    final description = certificate['description'] as String? ?? '';
+    final fee = certificate['fee'] as String? ?? '';
+    final accent = certificate['accent'] as Color? ?? _brandBlue;
+    final background = certificate['background'] as Color? ?? _softBlue;
+    final icon = certificate['icon'] as IconData? ?? Icons.description_outlined;
+
+    return Column(
+      children: [
+        _buildServicesTopBar(
+          sectionLabel: "Services",
+          title: title,
+          subtitle: "Complete the request form below.",
+          allowBackToMenu: true,
+          onBack: () {
+            setState(() {
+              _selectedCertificateRequest = null;
+              _serviceView = _ResidentServiceView.certificates;
+            });
+          },
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE9EDF2)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0A101828),
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  item['description'] ?? '',
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
+                child: Row(
                   children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: background,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: accent, size: 22),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.schedule_outlined,
-                            size: 14,
-                            color: Color(0xFF64748B),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Color(0xFF2A2F35),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              item['meta'] ?? '',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 11,
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              color: Color(0xFF667085),
+                              fontSize: 12.5,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            fee,
+                            style: const TextStyle(
+                              color: Color(0xFF2A2F35),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    FilledButton(
-                      onPressed: () {
-                        _showSnackBar("${item['title']} request submitted.");
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _brandBlue,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        "Request",
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 18),
+              _buildReportSectionTitle("Personal Information"),
+              const SizedBox(height: 10),
+              _buildCertificateTextField(
+                fieldKey: 'full_name',
+                label: 'Full Name',
+                hint: 'Enter your full name',
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'address',
+                label: 'Address',
+                hint: 'Enter your address',
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'contact_number',
+                label: 'Contact Number',
+                hint: 'Enter your contact number',
+                keyboardType: TextInputType.phone,
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'email',
+                label: 'Email Address',
+                hint: 'Enter your email address',
+                keyboardType: TextInputType.emailAddress,
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'date_of_birth',
+                label: 'Date of Birth',
+                hint: 'MM/DD/YYYY',
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'civil_status',
+                label: 'Civil Status',
+                hint: 'Enter your civil status',
+              ),
+              const SizedBox(height: 8),
+              _buildReportSectionTitle("Request Details"),
+              const SizedBox(height: 10),
+              ..._buildCertificateSpecificFields(
+                certificate['key'] as String? ?? '',
+              ),
+              _buildCertificateTextField(
+                fieldKey: 'purpose',
+                label: 'Purpose of Request',
+                hint: 'State the purpose of your request',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 8),
+              _buildReportSectionTitle("Payment Method"),
+              const SizedBox(height: 10),
+              _buildCertificatePaymentMethodSelector(),
+              if (_selectedCertificatePaymentMethod == "GCash") ...[
+                const SizedBox(height: 14),
+                _buildGcashPaymentInstructionsCard(),
+                const SizedBox(height: 12),
+                _buildCertificateTextField(
+                  fieldKey: 'payment_reference',
+                  label: 'GCash Reference Number',
+                  hint: 'Enter the payment reference number',
+                ),
+                const SizedBox(height: 10),
+                _buildPaymentProofUploader(),
               ],
-            ),
-          );
-        }),
+              const SizedBox(height: 8),
+              _buildReportSectionTitle("Additional Notes"),
+              const SizedBox(height: 10),
+              _buildCertificateTextField(
+                fieldKey: 'additional_notes',
+                label: 'Additional Notes',
+                hint: 'Add supporting notes if needed',
+                maxLines: 4,
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isSubmittingCertificateRequest
+                      ? null
+                      : _submitCertificateRequestForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _brandBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    _isSubmittingCertificateRequest
+                        ? "Submitting..."
+                        : "Submit Request",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "This is a draft request form and may still be updated once the barangay confirms the final required fields for each certificate.",
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
+  List<Widget> _buildCertificateSpecificFields(String certificateKey) {
+    switch (certificateKey) {
+      case 'certificate_of_indigency':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'institution_agency',
+            label: 'Name of Institution / Agency',
+            hint: 'Enter the institution or agency name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'reason_for_request',
+            label: 'Reason for Request',
+            hint: 'Explain why you need this certificate',
+            maxLines: 3,
+          ),
+        ];
+      case 'good_moral_residency':
+        return [
+          _buildCertificateVariantSelector(),
+          _buildCertificateTextField(
+            fieldKey: 'length_of_stay',
+            label: 'Length of Stay in Barangay',
+            hint: 'Example: 5 years',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'institution_agency',
+            label: 'Name of School / Employer / Agency',
+            hint: 'Enter the requesting school, employer, or agency',
+          ),
+        ];
+      case 'barangay_clearance_for_loan':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'loan_purpose',
+            label: 'Loan Purpose',
+            hint: 'State the purpose of the loan',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'lending_company',
+            label: 'Name of Lending Company / Bank',
+            hint: 'Enter the lending company or bank name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'loan_amount',
+            label: 'Amount to be Borrowed',
+            hint: 'Enter the loan amount',
+            keyboardType: TextInputType.number,
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'length_of_stay',
+            label: 'Length of Stay in Barangay',
+            hint: 'Example: 5 years',
+          ),
+        ];
+      case 'barangay_id':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'gender',
+            label: 'Gender',
+            hint: 'Enter your gender',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'occupation',
+            label: 'Occupation',
+            hint: 'Enter your occupation',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'emergency_contact_name',
+            label: 'Emergency Contact Name',
+            hint: 'Enter emergency contact name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'emergency_contact_number',
+            label: 'Emergency Contact Number',
+            hint: 'Enter emergency contact number',
+            keyboardType: TextInputType.phone,
+          ),
+        ];
+      case 'special_certification':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'certification_details',
+            label: 'Details of Certification Needed',
+            hint: 'Describe the certification needed',
+            maxLines: 3,
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'requesting_party',
+            label: 'Name of Agency / Person Requesting It',
+            hint: 'Enter the requesting agency or person',
+          ),
+        ];
+      case 'store_business_clearance':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'business_name',
+            label: 'Business Name',
+            hint: 'Enter your business name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'business_address',
+            label: 'Business Address',
+            hint: 'Enter the business address',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'business_type',
+            label: 'Type of Business',
+            hint: 'Enter the type of business',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'years_of_operation',
+            label: 'Years of Operation',
+            hint: 'Enter years of operation',
+          ),
+        ];
+      case 'tricycle_clearance':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'operator_name',
+            label: 'Driver / Operator Name',
+            hint: 'Enter the driver or operator name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'plate_number',
+            label: 'Tricycle Plate Number',
+            hint: 'Enter the plate number',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'route_area',
+            label: 'Route / Area of Operation',
+            hint: 'Enter the route or area of operation',
+          ),
+        ];
+      case 'banca_clearance':
+        return [
+          _buildCertificateTextField(
+            fieldKey: 'operator_name',
+            label: 'Owner / Operator Name',
+            hint: 'Enter the owner or operator name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'banca_name',
+            label: 'Banca Name',
+            hint: 'Enter the banca name',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'banca_registration_number',
+            label: 'Banca Registration Number',
+            hint: 'Enter the registration number',
+          ),
+          _buildCertificateTextField(
+            fieldKey: 'operation_area',
+            label: 'Area of Operation',
+            hint: 'Enter the area of operation',
+          ),
+        ];
+      default:
+        return const [];
+    }
+  }
+
+  Widget _buildCertificateTextField({
+    required String fieldKey,
+    required String label,
+    required String hint,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: Color(0xFF475467),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _certificateControllers[fieldKey],
+            keyboardType: keyboardType,
+            maxLines: maxLines,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: maxLines > 1 ? 14 : 16,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCertificatePaymentMethodSelector() {
+    final options = ["GCash", "Over-the-Counter"];
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: options.map((option) {
+        final isSelected = _selectedCertificatePaymentMethod == option;
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedCertificatePaymentMethod = option;
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected ? _brandBlue : Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: isSelected ? _brandBlue : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Text(
+              option,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF475467),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildGcashPaymentInstructionsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            "GCash Payment Instructions",
+            style: TextStyle(
+              color: _brandBlue,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            "Send the payment to the GCash receiver below, then enter the reference number and upload a screenshot of your payment confirmation.",
+            style: TextStyle(
+              color: Color(0xFF475569),
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            "Receiver Name: $_demoGcashReceiverName",
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            "GCash Number: $_demoGcashReceiverNumber",
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentProofUploader() {
+    final hasImage = _selectedPaymentProofImage != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Payment Proof Screenshot",
+          style: TextStyle(
+            color: Color(0xFF334155),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickPaymentProofImage,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                if (hasImage)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      _selectedPaymentProofImage!,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.receipt_long_outlined,
+                        size: 44,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  hasImage
+                      ? "Tap to replace payment proof"
+                      : "Tap to upload payment proof",
+                  style: const TextStyle(
+                    color: _brandBlue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCertificateVariantSelector() {
+    final variants = ["Good Moral", "Residency"];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Type of Certificate",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: Color(0xFF475467),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: variants.map((variant) {
+              final isSelected = _selectedCertificateVariant == variant;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedCertificateVariant = variant;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? _brandBlue : Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color:
+                          isSelected ? _brandBlue : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Text(
+                    variant,
+                    style: TextStyle(
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF475467),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActivityTab() {
+    final activities = <Map<String, dynamic>>[
+      ..._documentRequests,
+      ..._reports,
+    ]..sort((left, right) {
+        final leftDate = DateTime.tryParse(
+              left['created_at']?.toString() ?? '',
+            ) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final rightDate = DateTime.tryParse(
+              right['created_at']?.toString() ?? '',
+            ) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return rightDate.compareTo(leftDate);
+      });
+
     final groupedReports = <String, List<Map<String, dynamic>>>{};
 
-    for (final report in _reports) {
-      final label = _formatLongDate(report['created_at']?.toString());
+    for (final activity in activities) {
+      final label = _formatLongDate(activity['created_at']?.toString());
       groupedReports.putIfAbsent(label, () => <Map<String, dynamic>>[]).add(
-            report,
+            activity,
           );
     }
 
@@ -3944,7 +5657,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ),
             child: _isLoadingReports
                 ? const Center(child: CircularProgressIndicator())
-                : _reports.isEmpty
+                : activities.isEmpty
                     ? const Center(
                         child: Text(
                           "No activity yet.",
@@ -4222,20 +5935,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _buildProfileSheetParagraph(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF424751),
-          fontSize: 14,
-          height: 1.45,
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileSheetInfoRow({
     required IconData icon,
     required String title,
@@ -4393,16 +6092,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ),
                     SwitchListTile(
                       value: _notifyAnnouncements,
-                      activeColor: _brandBlue,
+                      activeThumbColor: _brandBlue,
                       title: const Text("Barangay announcements"),
-                      subtitle: const Text("Get notified about public updates."),
+                      subtitle:
+                          const Text("Get notified about public updates."),
                       onChanged: (value) => updatePreference(
                         () => _notifyAnnouncements = value,
                       ),
                     ),
                     SwitchListTile(
                       value: _notifyReportUpdates,
-                      activeColor: _brandBlue,
+                      activeThumbColor: _brandBlue,
                       title: const Text("Report updates"),
                       subtitle:
                           const Text("Receive status changes for reports."),
@@ -4412,7 +6112,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ),
                     SwitchListTile(
                       value: _notifyDocumentUpdates,
-                      activeColor: _brandBlue,
+                      activeThumbColor: _brandBlue,
                       title: const Text("Document requests"),
                       subtitle:
                           const Text("Receive certificate request updates."),
@@ -4449,7 +6149,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   "Profile",
                   style: TextStyle(
                     color: _brandBlue,
-                    fontSize: 15,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -4548,6 +6248,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   title: "Notification Preferences",
                   onTap: _showNotificationPreferencesSheet,
                 ),
+                const Divider(height: 1, color: Color(0xFFF3F6F9)),
+                _buildProfileTile(
+                  icon: Icons.logout_rounded,
+                  title: "Log out",
+                  onTap: _logout,
+                ),
               ],
             ),
           ),
@@ -4603,6 +6309,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             return _buildReportTab();
           case _ResidentServiceView.certificates:
             return _buildCertificatesTab();
+          case _ResidentServiceView.certificateRequestForm:
+            return _buildCertificateRequestFormTab();
           case _ResidentServiceView.menu:
             return _buildServicesMenuTab();
         }
@@ -4644,35 +6352,39 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         }),
         destinations: const [
           NavigationDestination(
-            icon: _BottomNavIcon(
-              icon: Icons.home_outlined,
-              color: Color(0xFF64748B),
+            icon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/home_menu.svg',
             ),
-            selectedIcon:
-                _BottomNavIcon(icon: Icons.home_outlined, color: _brandBlue),
+            selectedIcon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/home_menu_active.svg',
+            ),
             label: "Home",
           ),
           NavigationDestination(
-            icon: _ServicesNavIcon(color: Color(0xFF64748B)),
-            selectedIcon: _ServicesNavIcon(color: _brandBlue),
+            icon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/services_menu.svg',
+            ),
+            selectedIcon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/services_menu_active.svg',
+            ),
             label: "Services",
           ),
           NavigationDestination(
-            icon: _BottomNavIcon(
-              icon: Icons.history_rounded,
-              color: Color(0xFF64748B),
+            icon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/activity_menu.svg',
             ),
-            selectedIcon:
-                _BottomNavIcon(icon: Icons.history_rounded, color: _brandBlue),
+            selectedIcon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/activity_menu_active.svg',
+            ),
             label: "Activity",
           ),
           NavigationDestination(
-            icon: _BottomNavIcon(
-              icon: Icons.person_outline,
-              color: Color(0xFF64748B),
+            icon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/profile_menu.svg',
             ),
-            selectedIcon:
-                _BottomNavIcon(icon: Icons.person_outline, color: _brandBlue),
+            selectedIcon: _BottomNavSvgIcon(
+              assetPath: 'lib/assets/menu_icons/profile_menu_active.svg',
+            ),
             label: "Profile",
           ),
         ],
@@ -4930,12 +6642,12 @@ class _ProfileFaqItem extends StatelessWidget {
   }
 }
 
-class _ServicesNavIcon extends StatelessWidget {
-  const _ServicesNavIcon({
-    required this.color,
+class _BottomNavSvgIcon extends StatelessWidget {
+  const _BottomNavSvgIcon({
+    required this.assetPath,
   });
 
-  final Color color;
+  final String assetPath;
 
   @override
   Widget build(BuildContext context) {
@@ -4943,45 +6655,14 @@ class _ServicesNavIcon extends StatelessWidget {
       width: _ResidentDashboardScreenState._bottomNavIconSize,
       height: _ResidentDashboardScreenState._bottomNavIconSize,
       child: Center(
-        child: Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: List.generate(
-            9,
-            (_) => Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
-            ),
+        child: Transform.translate(
+          offset: const Offset(0, 5),
+          child: SvgPicture.asset(
+            assetPath,
+            width: 24,
+            height: 24,
+            fit: BoxFit.contain,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomNavIcon extends StatelessWidget {
-  const _BottomNavIcon({
-    required this.icon,
-    required this.color,
-  });
-
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: _ResidentDashboardScreenState._bottomNavIconSize,
-      height: _ResidentDashboardScreenState._bottomNavIconSize,
-      child: Center(
-        child: Icon(
-          icon,
-          color: color,
-          size: _ResidentDashboardScreenState._bottomNavIconSize,
         ),
       ),
     );

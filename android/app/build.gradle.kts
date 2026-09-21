@@ -42,7 +42,7 @@ applicationVariants.all {
     outputs.all {
         val outputImpl =
             this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-        outputImpl.outputFileName = "Bancao-Bancao App.apk"
+        outputImpl.outputFileName = "BancaoConnect.apk"
     }
 }
 }

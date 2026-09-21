@@ -177,7 +177,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_newProfileImage != null) {
         final croppedUrl = await _uploadImage(
           _newProfileImage!,
-          "profile_images/${user.id}.png",
+          "${user.id}/profile_images/profile.png",
         );
         payload['profile_image'] = croppedUrl;
       }
@@ -185,7 +185,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_newProfileImageOriginal != null) {
         final originalUrl = await _uploadImage(
           _newProfileImageOriginal!,
-          "profile_images_original/${user.id}.png",
+          "${user.id}/profile_images_original/profile.png",
         );
         payload['profile_image_original'] = originalUrl;
       }
@@ -229,9 +229,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
       setState(() => _isSaving = false);
       Navigator.pop(context, true);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showTopToast("Failed to save profile: $e");
+      _showTopToast("Failed to save profile. Please try again.");
       setState(() => _isSaving = false);
       return;
     }

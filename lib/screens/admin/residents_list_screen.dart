@@ -54,8 +54,8 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       setState(() {
         userRole = data['role'];
       });
-    } catch (e) {
-      debugPrint("ROLE ERROR: $e");
+    } catch (_) {
+      // Role loading failure leaves admin actions unavailable until a retry.
     }
   }
 
@@ -74,11 +74,11 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
         residents = List<Map<String, dynamic>>.from(data);
         isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() => isLoading = false);
-      _showTopToast('Error loading residents: $e');
+      _showTopToast('Unable to load residents right now.');
     }
   }
 
@@ -90,12 +90,13 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
     try {
       await supabase.from('residents').delete().eq('id', id);
 
+      if (!mounted) return;
       setState(() {
         residents.removeWhere((resident) => resident['id'] == id);
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showTopToast('Delete failed: $e');
+      _showTopToast('Unable to delete resident right now.');
     }
   }
 
@@ -115,15 +116,16 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
         'approved_at': DateTime.now().toIso8601String(),
       }).eq('id', id);
 
+      if (!mounted) return;
       setState(() {
         final index = residents.indexWhere((r) => r['id'] == id);
         if (index != -1) {
           residents[index]['status'] = newStatus;
         }
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showTopToast('Permission denied or error: $e');
+      _showTopToast('Unable to update resident status right now.');
     }
   }
 
@@ -253,7 +255,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
             MaterialPageRoute(builder: (context) => const AddResidentScreen()),
           );
 
-          if (newResident != null) {
+          if (newResident != null && mounted) {
             setState(() {
               residents.insert(0, newResident);
             });

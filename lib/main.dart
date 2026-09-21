@@ -14,10 +14,52 @@ import 'screens/intro/app_intro_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /// Initialize Supabase using config file
-  await SupabaseConfig.initialize();
+  try {
+    /// Initialize Supabase using config file
+    await SupabaseConfig.initialize();
+    runApp(const MyApp());
+  } catch (error) {
+    runApp(AppStartupError(errorMessage: error.toString()));
+  }
+}
 
-  runApp(const MyApp());
+class AppStartupError extends StatelessWidget {
+  final String errorMessage;
+
+  const AppStartupError({super.key, required this.errorMessage});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 40, color: Colors.red),
+                const SizedBox(height: 12),
+                const Text(
+                  'App failed to start.',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  errorMessage,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

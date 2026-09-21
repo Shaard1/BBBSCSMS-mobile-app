@@ -22,6 +22,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen> {
   }
 
   Future<void> _initializeCamera() async {
+    CameraController? controller;
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -34,19 +35,24 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen> {
         orElse: () => cameras.first,
       );
 
-      final controller = CameraController(
+      final initializedController = CameraController(
         rear,
         ResolutionPreset.high,
         enableAudio: false,
       );
+      controller = initializedController;
 
-      await controller.initialize();
-      if (!mounted) return;
+      await initializedController.initialize();
+      if (!mounted) {
+        await initializedController.dispose();
+        return;
+      }
       setState(() {
-        _controller = controller;
+        _controller = initializedController;
         _isInitializing = false;
       });
     } catch (_) {
+      await controller?.dispose();
       if (mounted) {
         Navigator.pop(context);
       }
@@ -164,28 +170,28 @@ class _IdFrameOverlay extends StatelessWidget {
               top: 0,
               right: 0,
               height: top,
-              child: Container(color: Colors.black.withOpacity(0.35)),
+              child: Container(color: Colors.black.withValues(alpha: 0.35)),
             ),
             Positioned(
               left: 0,
               top: top,
               width: left,
               height: frameHeight,
-              child: Container(color: Colors.black.withOpacity(0.35)),
+              child: Container(color: Colors.black.withValues(alpha: 0.35)),
             ),
             Positioned(
               left: right,
               top: top,
               right: 0,
               height: frameHeight,
-              child: Container(color: Colors.black.withOpacity(0.35)),
+              child: Container(color: Colors.black.withValues(alpha: 0.35)),
             ),
             Positioned(
               left: 0,
               top: bottom,
               right: 0,
               bottom: 0,
-              child: Container(color: Colors.black.withOpacity(0.35)),
+              child: Container(color: Colors.black.withValues(alpha: 0.35)),
             ),
             Positioned(
               left: left,
@@ -194,7 +200,10 @@ class _IdFrameOverlay extends StatelessWidget {
               height: frameHeight,
               child: Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white.withOpacity(0.9), width: 2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    width: 2,
+                  ),
                 ),
               ),
             ),

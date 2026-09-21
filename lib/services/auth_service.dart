@@ -38,36 +38,68 @@ class AuthService {
     // First, check if user is an admin in the profiles table
     final profile = await _client
         .from('profiles')
-        .select('role')
+        .select('role, full_name')
         .eq('id', userId)
         .maybeSingle();
 
     // If user has admin role, allow login
-    if (profile != null && profile['role'] == 'admin') {
+    final profileRole =
+        (profile?['role'] as String?)?.trim().toLowerCase() ?? '';
+    if (profileRole == 'admin') {
       return 'admin';
     }
 
     // For non-admin users, check the residents table for approval status
-    final resident = await _client
+    var resident = await _client
         .from('residents')
-        .select('status, rejection_reason, full_name')
-        .eq('id', userId)
-        .single();
+        .select('id, user_id, status, rejection_reason, full_name')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    final status = resident['status'] as String? ?? 'pending';
+    resident ??= await _client
+        .from('residents')
+        .select('id, user_id, status, rejection_reason, full_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (resident == null) {
+      if (profileRole == 'resident') {
+        final createdResident = await _createResidentRecordFromProfile(
+          userId: userId,
+          fullName: profile?['full_name']?.toString() ?? '',
+        );
+
+        if (createdResident) {
+          return 'resident';
+        }
+      }
+
+      await _client.auth.signOut();
+      throw AuthMessageException(
+        "Your resident record is not linked to this account yet. Please contact the barangay admin to relink your account.",
+      );
+    }
+
+    final status =
+        (resident['status'] as String?)?.trim().toLowerCase() ?? 'pending';
 
     if (status == 'pending') {
       await _client.auth.signOut();
       throw AuthMessageException(
-        "Your account is still pending approval. Please wait for confirmation.",
+        "Your account has been submitted and is still pending approval. Please wait 1-2 working days for barangay verification.",
       );
     }
 
     if (status == 'rejected') {
       await _client.auth.signOut();
+      final rejectionReason =
+          (resident['rejection_reason'] as String?)?.trim();
+      final reasonMessage = rejectionReason == null || rejectionReason.isEmpty
+          ? "No reason was provided."
+          : rejectionReason;
 
       throw AuthMessageException(
-        "Your account request was not approved. Please contact the barangay office.",
+        "Your account request was rejected. Reason: $reasonMessage Please register again with corrected information.",
       );
     }
 
@@ -94,13 +126,34 @@ class AuthService {
       }
     }
 
-    final role = (profile['role'] as String?)?.trim() ?? '';
+    final role = profileRole;
 
     if (role.isEmpty) {
       return 'resident';
     }
 
     return role;
+  }
+
+  Future<bool> _createResidentRecordFromProfile({
+    required String userId,
+    required String fullName,
+  }) async {
+    try {
+      await _client.from('residents').insert({
+        'id': userId,
+        'user_id': userId,
+        'full_name': fullName.trim().isNotEmpty ? fullName.trim() : 'Resident',
+        'status': 'pending',
+        'address': '',
+        'contact_number': '',
+        'gender': '',
+        'civil_status': '',
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /* ---------------- REGISTER ---------------- */

@@ -5,6 +5,8 @@ class Announcement {
   final String title;
   final String content;
   final bool isPublished;
+  final String createdBy;
+  final String createdByName;
   final String thumbnailUrl;
   final List<String> imageUrls;
   final DateTime createdAt;
@@ -14,6 +16,8 @@ class Announcement {
     required this.title,
     required this.content,
     required this.isPublished,
+    required this.createdBy,
+    required this.createdByName,
     required this.thumbnailUrl,
     required this.imageUrls,
     required this.createdAt,
@@ -101,6 +105,8 @@ class Announcement {
       title: json['title']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
       isPublished: json['is_published'] == null ? true : json['is_published'] == true,
+      createdBy: json['created_by']?.toString() ?? '',
+      createdByName: json['created_by_name']?.toString().trim() ?? '',
       thumbnailUrl: thumbnailUrl,
       imageUrls: imageUrls,
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??

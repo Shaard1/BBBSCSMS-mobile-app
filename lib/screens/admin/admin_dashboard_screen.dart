@@ -26,23 +26,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   /* ---------------- FETCH REPORTS ---------------- */
 
   Future<void> fetchReports() async {
-    final response = await supabase
-        .from('reports')
-        .select()
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('reports')
+          .select()
+          .order('created_at', ascending: false);
 
-    setState(() {
-      reports = response;
-      isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        reports = response;
+        isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+    }
   }
 
   /* ---------------- UPDATE STATUS ---------------- */
 
   Future<void> updateStatus(String id, String status) async {
-    await supabase.from('reports').update({'status': status}).eq('id', id);
-
-    fetchReports();
+    try {
+      await supabase.from('reports').update({'status': status}).eq('id', id);
+      await fetchReports();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update report status.')),
+      );
+    }
   }
 
   /* ---------------- UI BUILD ---------------- */

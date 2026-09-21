@@ -9,7 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'id_camera_capture_screen.dart';
+import '../crop_screen.dart';
 import 'register_verification_screen.dart';
 import '../../widgets/top_toast.dart';
 
@@ -20,7 +20,8 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen>
+    with TickerProviderStateMixin {
   static const _brandBlue = Color(0xFF006CBF);
   static const _pageBackground = Color(0xFFF8FAFC);
   static const _cardBackground = Colors.white;
@@ -31,8 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const _fieldTextColor = Color(0xFF484D51);
   static const _bodyColor = Color(0xFF64748B);
   static const _titleColor = Color(0xFF006CBF);
-  static const _uploadBorderColor = Color(0xFFC2C6D3);
-  static const _checkboxFillColor = Color(0xFFF3F4F5);
 
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -40,8 +39,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _addressController = TextEditingController();
   final _contactController = TextEditingController();
+  final _birthDayController = TextEditingController();
+  final _birthMonthController = TextEditingController();
+  final _birthYearController = TextEditingController();
   final _scrollController = ScrollController();
-  final _verificationSectionKey = GlobalKey();
 
   final ImagePicker _picker = ImagePicker();
 
@@ -53,14 +54,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? birthYear;
 
   File? idImage;
+  File? _profileImage;
+  File? _profileImageOriginal;
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  bool _confirmedAccuracy = false;
   String? _expandedDropdown;
   String? _hoveredDropdown;
   final Map<String, String?> _fieldErrors = {};
+  late final Map<String, AnimationController> _fieldShakeControllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _fieldShakeControllers = {
+      for (final fieldKey in [
+        'full_name',
+        'birth_day',
+        'birth_month',
+        'contact',
+        'gender',
+        'civil_status',
+        'address',
+        'email',
+        'password',
+        'confirm_password',
+      ])
+        fieldKey: AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 320),
+        ),
+    };
+  }
 
   @override
   void dispose() {
@@ -70,7 +96,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _confirmPasswordController.dispose();
     _addressController.dispose();
     _contactController.dispose();
+    _birthDayController.dispose();
+    _birthMonthController.dispose();
+    _birthYearController.dispose();
     _scrollController.dispose();
+    for (final controller in _fieldShakeControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -90,6 +122,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String? _errorFor(String fieldKey) => _fieldErrors[fieldKey];
+
+  void _triggerFieldShake(String fieldKey) {
+    final controller = _fieldShakeControllers[fieldKey];
+    controller
+      ?..stop()
+      ..forward(from: 0);
+  }
+
+  Widget _buildShakingField(String fieldKey, Widget child) {
+    final controller = _fieldShakeControllers[fieldKey];
+    if (controller == null) return child;
+
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, animatedChild) {
+        final offset = 6 * (1 - (controller.value - 0.5).abs() * 2);
+        final direction =
+                controller.value < 0.25 ||
+                    (controller.value >= 0.5 && controller.value < 0.75)
+            ? -1.0
+            : 1.0;
+        return Transform.translate(
+          offset: Offset(offset * direction, 0),
+          child: animatedChild,
+        );
+      },
+    );
+  }
+
+  void _handleBirthDateChanged(String fieldKey, String value) {
+    if (fieldKey == 'birth_day') {
+      birthDay = value.trim().isEmpty ? null : value.trim();
+      final parsedDay = int.tryParse(value);
+
+      if (value.isEmpty) {
+        _setFieldError(fieldKey, null);
+        return;
+      }
+
+      if (parsedDay == null || parsedDay < 1 || parsedDay > 31) {
+        _setFieldError(fieldKey, 'Use 1-31.');
+        _triggerFieldShake(fieldKey);
+        return;
+      }
+
+      _setFieldError(fieldKey, null);
+      return;
+    }
+
+    if (fieldKey == 'birth_month') {
+      birthMonth = value.trim().isEmpty ? null : value.trim();
+      final parsedMonth = int.tryParse(value);
+
+      if (value.isEmpty) {
+        _setFieldError(fieldKey, null);
+        return;
+      }
+
+      if (parsedMonth == null || parsedMonth < 1 || parsedMonth > 12) {
+        _setFieldError(fieldKey, 'Use 1-12.');
+        _triggerFieldShake(fieldKey);
+        return;
+      }
+
+      _setFieldError(fieldKey, null);
+      return;
+    }
+
+    birthYear = value.trim().isEmpty ? null : value.trim();
+  }
 
   String _extractLocalContactDigits(String value) {
     var digitsOnly = value.replaceAll(RegExp(r'\D'), '');
@@ -133,78 +236,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
         message.contains('connection');
   }
 
-  void _scrollToVerificationSection() {
-    final context = _verificationSectionKey.currentContext;
-    if (context == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOut,
-        alignment: 0.1,
-      );
-    });
-  }
+  String _registrationErrorMessage(Object error) {
+    final message = error.toString().toLowerCase();
 
-  Future<void> _pickIdImage() async {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Use Camera'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _handlePickedImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from Gallery'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _handlePickedImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handlePickedImage(ImageSource source) async {
-    try {
-      XFile? picked;
-      if (source == ImageSource.camera) {
-        final capturedFile = await Navigator.push<File?>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const IdCameraCaptureScreen(),
-          ),
-        );
-        if (capturedFile != null) {
-          picked = XFile(capturedFile.path);
-        }
-      } else {
-        picked = await _picker.pickImage(
-          source: source,
-          imageQuality: 70,
-        );
-      }
-
-      if (picked == null || !mounted) return;
-      final selected = picked;
-
-      setState(() {
-        idImage = File(selected.path);
-        _fieldErrors.remove('id_image');
-      });
-    } catch (e) {
-      _showSnackBar('Image error: $e');
+    if (_isNetworkError(error)) {
+      return 'No internet connection. Please try again.';
     }
+
+    if (message.contains('over_email_send_rate_limit')) {
+      return 'Please wait a few seconds before trying again. Supabase is temporarily limiting confirmation emails.';
+    }
+
+    if (message.contains('email_provider_disabled')) {
+      return 'Email/password signup is disabled in Supabase. Enable the Email provider, but keep email confirmation turned off.';
+    }
+
+    if (message.contains('email confirmation is still enabled')) {
+      return 'Email confirmation is still enabled in Supabase. Turn it off so residents can submit their ID for barangay approval.';
+    }
+
+    if (message.contains('email not confirmed') ||
+        message.contains('confirm your email')) {
+      return 'Please confirm your email first, then log in to complete registration.';
+    }
+
+    if (message.contains('already registered') ||
+        message.contains('already exists') ||
+        message.contains('user already registered')) {
+      return 'This email is already registered. Please log in or use another email.';
+    }
+
+    return 'Registration failed. Please check your details and try again.';
   }
 
   bool _validateForm() {
@@ -251,14 +313,111 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ..addAll(nextErrors);
     });
 
+    for (final fieldKey in nextErrors.keys) {
+      _triggerFieldShake(fieldKey);
+    }
+
     return nextErrors.isEmpty;
+  }
+
+  String? _buildBirthdateValue() {
+    final dayText = _birthDayController.text.trim();
+    final monthText = _birthMonthController.text.trim();
+    final yearText = _birthYearController.text.trim();
+
+    if (dayText.isEmpty || monthText.isEmpty || yearText.isEmpty) {
+      return null;
+    }
+
+    final day = int.tryParse(dayText);
+    final month = int.tryParse(monthText);
+    final year = int.tryParse(yearText);
+
+    if (day == null || month == null || year == null) {
+      return null;
+    }
+
+    if (day < 1 || day > 31 || month < 1 || month > 12 || yearText.length != 4) {
+      return null;
+    }
+
+    return '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _pickProfileImage() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Use Camera'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _handleProfileImageSelection(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Gallery'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _handleProfileImageSelection(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleProfileImageSelection(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (picked == null || !mounted) return;
+
+      final originalFile = File(picked.path);
+      final originalBytes = await originalFile.readAsBytes();
+      if (!mounted) return;
+      final croppedFile = await Navigator.push<File?>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CropScreen(
+            imageBytes: originalBytes,
+            sourcePath: originalFile.path,
+          ),
+        ),
+      );
+
+      if (croppedFile == null || !mounted) return;
+
+      setState(() {
+        _profileImage = croppedFile;
+        _profileImageOriginal = originalFile;
+      });
+    } catch (e) {
+      _showSnackBar('Image error: $e');
+    }
   }
 
   Future<String?> uploadImage(File file, String path) async {
     final storage = Supabase.instance.client.storage;
     final uploadFile = await _compressImageForUpload(file);
 
-    await storage.from('resident-files').upload(path, uploadFile);
+    await storage.from('resident-files').upload(
+          path,
+          uploadFile,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: true,
+          ),
+        );
 
     return storage.from('resident-files').getPublicUrl(path);
   }
@@ -289,75 +448,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _showRegistrationSubmittedDialog() async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Account Submitted',
-                  style: TextStyle(
-                    color: _brandBlue,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Your account has been submitted and is now pending approval by the barangay.\nPlease wait 1-2 working days for verification.',
-                  style: TextStyle(
-                    color: _bodyColor,
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _brandBlue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Go to Login',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Future<String?> _register({
     required String selectedIdType,
     required File selectedFrontIdImage,
@@ -379,19 +469,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
         throw Exception('Registration failed');
       }
 
+      if (authResponse.session == null ||
+          Supabase.instance.client.auth.currentSession == null) {
+        throw Exception(
+          'Email confirmation is still enabled in Supabase. Turn it off so residents can submit their ID for barangay approval.',
+        );
+      }
+
       final idImageFrontUrl = await uploadImage(
         selectedFrontIdImage,
-        'id_images/${user.id}_front.jpg',
+        '${user.id}/id_images/front.jpg',
       );
       final idImageBackUrl = await uploadImage(
         selectedBackIdImage,
-        'id_images/${user.id}_back.jpg',
+        '${user.id}/id_images/back.jpg',
       );
+      final birthdateValue = _buildBirthdateValue();
+      String? profileImageUrl;
+      String? profileImageOriginalUrl;
+
+      if (_profileImage != null) {
+        profileImageUrl = await uploadImage(
+          _profileImage!,
+          '${user.id}/profile_images/profile.png',
+        );
+      }
+
+      if (_profileImageOriginal != null) {
+        profileImageOriginalUrl = await uploadImage(
+          _profileImageOriginal!,
+          '${user.id}/profile_images_original/profile.png',
+        );
+      }
 
       final residentPayload = <String, dynamic>{
         'id': user.id,
+        'user_id': user.id,
+        'email': _emailController.text.trim(),
         'full_name': _fullNameController.text.trim(),
-        'birthdate': null,
+        'birthdate': birthdateValue,
+        'birth_day': _birthDayController.text.trim().isEmpty
+            ? null
+            : _birthDayController.text.trim(),
+        'birth_month': _birthMonthController.text.trim().isEmpty
+            ? null
+            : _birthMonthController.text.trim(),
+        'birth_year': _birthYearController.text.trim().isEmpty
+            ? null
+            : _birthYearController.text.trim(),
         'gender': gender!,
         'address': _addressController.text.trim(),
         'contact_number': _normalizedContactNumber(),
@@ -400,7 +525,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'id_image': idImageFrontUrl,
         'id_image_front': idImageFrontUrl,
         'id_image_back': idImageBackUrl,
-        'profile_image': null,
+        'profile_image': profileImageUrl,
+        'profile_image_original': profileImageOriginalUrl,
         'status': 'pending',
       };
 
@@ -411,41 +537,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // to legacy single-image payload so registration can still continue.
         final message = insertError.toString().toLowerCase();
         final missingNewColumns =
+            message.contains('email') ||
+            message.contains('birth_day') ||
+            message.contains('birth_month') ||
+            message.contains('birth_year') ||
             message.contains('id_image_front') ||
             message.contains('id_image_back') ||
+            message.contains('profile_image_original') ||
             message.contains('column') && message.contains('does not exist');
 
         if (!missingNewColumns) rethrow;
 
         final legacyPayload = <String, dynamic>{
           'id': user.id,
+          'user_id': user.id,
+          'email': _emailController.text.trim(),
           'full_name': _fullNameController.text.trim(),
-          'birthdate': null,
+          'birthdate': birthdateValue,
           'gender': gender!,
           'address': _addressController.text.trim(),
           'contact_number': _normalizedContactNumber(),
           'civil_status': civilStatus!,
           'id_type': selectedIdType,
           'id_image': idImageFrontUrl,
-          'profile_image': null,
+          'profile_image': profileImageUrl,
           'status': 'pending',
         };
+        if (message.contains('email')) {
+          legacyPayload.remove('email');
+        }
+        if (message.contains('birth_day')) {
+          legacyPayload.remove('birth_day');
+        }
+        if (message.contains('birth_month')) {
+          legacyPayload.remove('birth_month');
+        }
+        if (message.contains('birth_year')) {
+          legacyPayload.remove('birth_year');
+        }
+        if (message.contains('profile_image_original')) {
+          legacyPayload.remove('profile_image_original');
+        }
         await Supabase.instance.client.from('residents').insert(legacyPayload);
       }
 
       return null;
     } catch (e) {
-      if (_isNetworkError(e)) {
-        return 'No internet connection. Please try again.';
-      } else {
-        return 'Registration failed: $e';
-      }
+      return _registrationErrorMessage(e);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-    return 'Something went wrong. Please try again.';
   }
 
   Future<void> _continueToVerification() async {
@@ -482,9 +625,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     String hint,
     Widget prefixIcon, {
     Widget? suffixIcon,
-    String? errorText,
+    bool hasError = false,
   }) {
-    final hasError = errorText != null && errorText.isNotEmpty;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
@@ -535,20 +677,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           width: 1.6,
         ),
       ),
-      errorText: errorText,
-      errorStyle: const TextStyle(
-        color: Color(0xFFFF4D4F),
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFF4D4F), width: 1.3),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFF4D4F), width: 1.3),
-      ),
+    );
+  }
+
+  Widget _buildFieldWithReservedError({
+    required String fieldKey,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        child,
+        _buildFieldError(fieldKey),
+      ],
     );
   }
 
@@ -593,7 +734,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ? const Color(0xFFD5D9E1)
                 : _borderColor;
 
-    return MouseRegion(
+    return _buildShakingField(
+      fieldKey,
+      MouseRegion(
       onEnter: (_) => setState(() => _hoveredDropdown = fieldKey),
       onExit: (_) {
         if (_hoveredDropdown == fieldKey) {
@@ -731,8 +874,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   )
                 : const SizedBox.shrink(key: ValueKey('dropdown_closed')),
           ),
-          if (hasError)
-            Padding(
+          SizedBox(
+            height: 24,
+            child: hasError
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 6),
+                    child: Text(
+                      errorText,
+                      style: const TextStyle(
+                        color: Color(0xFFFF4D4F),
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildFieldError(String fieldKey) {
+    final errorText = _errorFor(fieldKey);
+    return SizedBox(
+      height: 24,
+      child: errorText == null || errorText.isEmpty
+          ? null
+          : Padding(
               padding: const EdgeInsets.only(left: 4, top: 6),
               child: Text(
                 errorText,
@@ -742,26 +910,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFieldError(String fieldKey) {
-    final errorText = _errorFor(fieldKey);
-    if (errorText == null || errorText.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 6),
-      child: Text(
-        errorText,
-        style: const TextStyle(
-          color: Color(0xFFFF4D4F),
-          fontSize: 12,
-        ),
-      ),
     );
   }
 
@@ -801,195 +949,143 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildSectionCard(List<Widget> children) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _cardBackground,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFFE7EBF1),
-          width: 2.0,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 14,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildBirthDateDropdown({
-    required String fieldKey,
-    required String hint,
-    required String? value,
-    required List<String> options,
-    required ValueChanged<String> onSelected,
-  }) {
-    final isExpanded = _expandedDropdown == fieldKey;
-    final isHovered = _hoveredDropdown == fieldKey;
-    final borderColor = isExpanded
-        ? const Color(0xFF6E7684)
-        : isHovered
-            ? const Color(0xFFD5D9E1)
-            : _borderColor;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoveredDropdown = fieldKey),
-      onExit: (_) {
-        if (_hoveredDropdown == fieldKey) {
-          setState(() => _hoveredDropdown = null);
-        }
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                setState(() {
-                  _expandedDropdown = isExpanded ? null : fieldKey;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 13,
-                ),
-                decoration: BoxDecoration(
-                  color: isHovered || isExpanded
-                      ? const Color(0xFFF1F3F6)
-                      : _cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: borderColor,
-                    width: 1.6,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        value ?? hint,
-                        style: const TextStyle(
-                          color: Color(0xFF3F4854),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      isExpanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: const Color(0xFF7E8796),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (isExpanded)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFD9DFE7),
-                    width: 1.6,
-                  ),
-                ),
-                child: Column(
-                  children: options.map((option) {
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () {
-                          setState(() {
-                            _expandedDropdown = null;
-                          });
-                          onSelected(option);
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 13,
-                          ),
-                          child: Text(
-                            option,
-                            style: const TextStyle(
-                              color: Color(0xFF3F4854),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBirthDateInputBox({
+    required String fieldKey,
+    required TextEditingController controller,
     required String hint,
     required int maxLength,
   }) {
-    return TextField(
+    final hasError = _errorFor(fieldKey) != null;
+    Widget input = TextField(
+      controller: controller,
       keyboardType: TextInputType.number,
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(maxLength),
       ],
-      style: const TextStyle(
-        color: _fieldTextColor,
+      onChanged: (value) => _handleBirthDateChanged(fieldKey, value),
+      style: TextStyle(
+        color: hasError ? const Color(0xFFFF4D4F) : _fieldTextColor,
         fontSize: 16,
         fontWeight: FontWeight.w400,
       ),
       decoration: InputDecoration(
         counterText: '',
         hintText: hint,
-        hintStyle: const TextStyle(
-          color: Color(0xFF9DA5AE),
+        hintStyle: TextStyle(
+          color: hasError ? const Color(0xFFFF4D4F) : const Color(0xFF9DA5AE),
           fontSize: 16,
         ),
         filled: true,
         fillColor: _cardBackground,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 13,
-        ),
+        contentPadding: const EdgeInsets.fromLTRB(14, 16, 14, 10),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(
-            color: Color(0xFFA7ADB6),
-            width: 1.4,
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: hasError ? const Color(0xFFFF4D4F) : _borderColor,
+            width: 1.6,
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(
-            color: _brandBlue,
-            width: 1.6,
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: hasError ? const Color(0xFFFF4D4F) : _brandBlue,
+            width: 1.3,
           ),
+        ),
+      ),
+    );
+    return _buildShakingField(fieldKey, input);
+  }
+
+  Widget _buildProfilePhotoPicker() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _pickProfileImage,
+          child: Container(
+            width: 124,
+            height: 124,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF3F7FB),
+              border: Border.all(
+                color: const Color(0xFFD8E3F0),
+                width: 2,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x12000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ],
+              image: _profileImage != null
+                  ? DecorationImage(
+                      image: FileImage(_profileImage!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: _profileImage == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.person_outline_rounded,
+                        size: 42,
+                        color: _brandBlue,
+                      ),
+                      SizedBox(height: 6),
+                      Icon(
+                        Icons.add_a_photo_outlined,
+                        size: 18,
+                        color: Color(0xFF6B7C93),
+                      ),
+                    ],
+                  )
+                : Align(
+                    alignment: Alignment.bottomRight,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      margin: const EdgeInsets.only(right: 6, bottom: 6),
+                      decoration: BoxDecoration(
+                        color: _brandBlue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.edit_outlined,
+                        size: 17,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _profileImage == null ? 'Add profile photo' : 'Change profile photo',
+          style: const TextStyle(
+            color: _brandBlue,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF2C2F32),
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -1047,40 +1143,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   children: [
                     _buildSectionTitle(1, 'Personal Information'),
+                    const SizedBox(height: 6),
+                    _buildProfilePhotoPicker(),
+                    const SizedBox(height: 18),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _fullNameController,
-                      style: _fieldInputTextStyle('full_name'),
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => _setFieldError('full_name', null),
-                      decoration: _fieldStyle(
-                        'Juan Dela Cruz',
-                        _assetFieldIcon(
-                          'lib/assets/Juan Dela Cruz Satus Icon.svg',
-                          width: 24,
-                          height: 24,
+                    _buildFieldLabel('Full name'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'full_name',
+                      child: _buildShakingField(
+                        'full_name',
+                        TextField(
+                          controller: _fullNameController,
+                          style: _fieldInputTextStyle('full_name'),
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => _setFieldError('full_name', null),
+                          decoration: _fieldStyle(
+                            'Juan Dela Cruz',
+                            _assetFieldIcon(
+                              'lib/assets/Juan Dela Cruz Satus Icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            hasError: _errorFor('full_name') != null,
+                          ),
                         ),
-                        errorText: _errorFor('full_name'),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Date of birth',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    _buildFieldLabel('Date of birth'),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const SizedBox(height: 12),
                               const Text(
                                 'Day',
                                 style: TextStyle(
@@ -1089,11 +1188,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 2),
                               _buildBirthDateInputBox(
+                                fieldKey: 'birth_day',
+                                controller: _birthDayController,
                                 hint: 'DD',
                                 maxLength: 2,
                               ),
+                              _buildFieldError('birth_day'),
                             ],
                           ),
                         ),
@@ -1102,6 +1204,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const SizedBox(height: 12),
                               const Text(
                                 'Month',
                                 style: TextStyle(
@@ -1110,11 +1213,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 2),
                               _buildBirthDateInputBox(
+                                fieldKey: 'birth_month',
+                                controller: _birthMonthController,
                                 hint: 'MM',
                                 maxLength: 2,
                               ),
+                              _buildFieldError('birth_month'),
                             ],
                           ),
                         ),
@@ -1123,6 +1229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const SizedBox(height: 12),
                               const Text(
                                 'Year',
                                 style: TextStyle(
@@ -1131,33 +1238,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 2),
                               _buildBirthDateInputBox(
+                                fieldKey: 'birth_year',
+                                controller: _birthYearController,
                                 hint: 'YYYY',
                                 maxLength: 4,
                               ),
+                              _buildFieldError('birth_year'),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _contactController,
-                      style: _fieldInputTextStyle('contact'),
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: [
-                        _PhilippineMobileFormatter(),
-                      ],
-                      onChanged: (_) => _setFieldError('contact', null),
-                      decoration: _fieldStyle(
-                        '912 345 6789',
-                        _assetFieldIcon('lib/assets/Contact Number Icon.svg'),
-                        errorText: _errorFor('contact'),
+                    _buildFieldLabel('Contact number'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'contact',
+                      child: _buildShakingField(
+                        'contact',
+                        TextField(
+                          controller: _contactController,
+                          style: _fieldInputTextStyle('contact'),
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          inputFormatters: [
+                            _PhilippineMobileFormatter(),
+                          ],
+                          onChanged: (_) => _setFieldError('contact', null),
+                          decoration: _fieldStyle(
+                            '912 345 6789',
+                            _assetFieldIcon(
+                              'lib/assets/Contact Number Icon.svg',
+                            ),
+                            hasError: _errorFor('contact') != null,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
+                    _buildFieldLabel('Gender'),
+                    const SizedBox(height: 6),
                     _buildDropdownField(
                       fieldKey: 'gender',
                       value: gender,
@@ -1177,6 +1299,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 10),
+                    _buildFieldLabel('Civil status'),
+                    const SizedBox(height: 6),
                     _buildDropdownField(
                       fieldKey: 'civil_status',
                       value: civilStatus,
@@ -1203,104 +1327,137 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _addressController,
-                      style: _fieldInputTextStyle('address'),
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => _setFieldError('address', null),
-                      decoration: _fieldStyle(
-                        'Address',
-                        _assetFieldIcon(
-                          'lib/assets/MapPin.svg',
-                          width: 24,
-                          height: 24,
+                    _buildFieldLabel('Address'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'address',
+                      child: _buildShakingField(
+                        'address',
+                        TextField(
+                          controller: _addressController,
+                          style: _fieldInputTextStyle('address'),
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => _setFieldError('address', null),
+                          decoration: _fieldStyle(
+                            'Address',
+                            _assetFieldIcon(
+                              'lib/assets/MapPin.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            hasError: _errorFor('address') != null,
+                          ),
                         ),
-                        errorText: _errorFor('address'),
                       ),
                     ),
                     const SizedBox(height: 18),
                     _buildSectionTitle(2, 'Account Details'),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _emailController,
-                      style: _fieldInputTextStyle('email'),
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => _setFieldError('email', null),
-                      decoration: _fieldStyle(
-                        'Email',
-                        _assetFieldIcon(
-                          'lib/assets/Email Status Icon.svg',
-                          width: 24,
-                          height: 24,
-                        ),
-                        errorText: _errorFor('email'),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _passwordController,
-                      style: _fieldInputTextStyle('password'),
-                      obscureText: !_isPasswordVisible,
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => _setFieldError('password', null),
-                      decoration: _fieldStyle(
-                        'Password',
-                        _assetFieldIcon(
-                          'lib/assets/Password Status Icon.svg',
-                          width: 24,
-                          height: 24,
-                        ),
-                        errorText: _errorFor('password'),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: _errorFor('password') != null
-                                ? const Color(0xFFFF4D4F)
-                                : _fieldIconColor,
-                            size: 20,
+                    _buildFieldLabel('Email'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'email',
+                      child: _buildShakingField(
+                        'email',
+                        TextField(
+                          controller: _emailController,
+                          style: _fieldInputTextStyle('email'),
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => _setFieldError('email', null),
+                          decoration: _fieldStyle(
+                            'Email',
+                            _assetFieldIcon(
+                              'lib/assets/Email Status Icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            hasError: _errorFor('email') != null,
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: _confirmPasswordController,
-                      style: _fieldInputTextStyle('confirm_password'),
-                      obscureText: !_isConfirmPasswordVisible,
-                      textInputAction: TextInputAction.done,
-                      onChanged: (_) => _setFieldError('confirm_password', null),
-                      onSubmitted: (_) => _continueToVerification(),
-                      decoration: _fieldStyle(
-                        'Confirm Password',
-                        _assetFieldIcon(
-                          'lib/assets/Password Status Icon.svg',
-                          width: 24,
-                          height: 24,
+                    _buildFieldLabel('Password'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'password',
+                      child: _buildShakingField(
+                        'password',
+                        TextField(
+                          controller: _passwordController,
+                          style: _fieldInputTextStyle('password'),
+                          obscureText: !_isPasswordVisible,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => _setFieldError('password', null),
+                          decoration: _fieldStyle(
+                            'Password',
+                            _assetFieldIcon(
+                              'lib/assets/Password Status Icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            hasError: _errorFor('password') != null,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: _errorFor('password') != null
+                                    ? const Color(0xFFFF4D4F)
+                                    : _fieldIconColor,
+                                size: 20,
+                              ),
+                            ),
+                          ),
                         ),
-                        errorText: _errorFor('confirm_password'),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _isConfirmPasswordVisible =
-                                  !_isConfirmPasswordVisible;
-                            });
-                          },
-                          icon: Icon(
-                            _isConfirmPasswordVisible
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: _errorFor('confirm_password') != null
-                                ? const Color(0xFFFF4D4F)
-                                : _fieldIconColor,
-                            size: 20,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildFieldLabel('Confirm password'),
+                    const SizedBox(height: 6),
+                    _buildFieldWithReservedError(
+                      fieldKey: 'confirm_password',
+                      child: _buildShakingField(
+                        'confirm_password',
+                        TextField(
+                          controller: _confirmPasswordController,
+                          style: _fieldInputTextStyle('confirm_password'),
+                          obscureText: !_isConfirmPasswordVisible,
+                          textInputAction: TextInputAction.done,
+                          onChanged: (_) =>
+                              _setFieldError('confirm_password', null),
+                          onSubmitted: (_) => _continueToVerification(),
+                          decoration: _fieldStyle(
+                            'Confirm Password',
+                            _assetFieldIcon(
+                              'lib/assets/Password Status Icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            hasError: _errorFor('confirm_password') != null,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isConfirmPasswordVisible =
+                                      !_isConfirmPasswordVisible;
+                                });
+                              },
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: _errorFor('confirm_password') != null
+                                    ? const Color(0xFFFF4D4F)
+                                    : _fieldIconColor,
+                                size: 20,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -1386,49 +1543,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
-  }
-}
-
-class _DashedRoundedRectPainter extends CustomPainter {
-  const _DashedRoundedRectPainter({
-    required this.color,
-    required this.radius,
-  });
-
-  final Color color;
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rect);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-
-    for (final metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        final next = distance + dashWidth;
-        canvas.drawPath(
-          metric.extractPath(distance, next.clamp(0, metric.length)),
-          paint,
-        );
-        distance += dashWidth + dashSpace;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRoundedRectPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
 

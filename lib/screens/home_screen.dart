@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = Supabase.instance.client.auth.currentUser;
 
       if (user == null) {
+        if (!mounted) return;
         setState(() {
           errorMessage = "Please log in to continue.";
           isLoading = false;
@@ -51,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .maybeSingle();
 
       if (data == null) {
+        if (!mounted) return;
         setState(() {
           errorMessage = AuthService.missingProfileMessage;
           isLoading = false;
@@ -65,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         errorMessage =
             "We could not load your profile right now. Please try again or contact the barangay admin.";

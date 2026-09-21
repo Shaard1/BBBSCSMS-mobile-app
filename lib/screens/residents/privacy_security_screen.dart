@@ -139,9 +139,9 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       _newPasswordController.clear();
       _confirmPasswordController.clear();
       _showSnackBar("Password updated successfully.");
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showSnackBar("Failed to update password: $e");
+      _showSnackBar("Failed to update password. Please try again.");
     } finally {
       if (mounted) {
         setState(() => _isSavingPassword = false);
@@ -166,9 +166,9 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       await _supabase.auth.resetPasswordForEmail(email);
       if (!mounted) return;
       _showSnackBar("Password reset email sent to $email");
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showSnackBar("Failed to send reset email: $e");
+      _showSnackBar("Failed to send reset email. Please try again.");
     } finally {
       if (mounted) {
         setState(() => _isSendingReset = false);

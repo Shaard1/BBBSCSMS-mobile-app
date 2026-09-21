@@ -59,7 +59,7 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      _showTopToast('Error: $e');
+      _showTopToast('Unable to add resident right now. Please try again.');
     } finally {
       if (mounted) {
         setState(() => isLoading = false);

@@ -29,6 +29,30 @@ class AnnouncementService {
         .toSet();
   }
 
+  Future<Map<String, String>> fetchAuthorNamesByIds(List<String> userIds) async {
+    final uniqueIds = userIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (uniqueIds.isEmpty) return {};
+
+    final response = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .inFilter('id', uniqueIds);
+
+    final result = <String, String>{};
+    for (final row in (response as List)) {
+      final id = row['id']?.toString() ?? '';
+      final fullName = row['full_name']?.toString().trim() ?? '';
+      if (id.isNotEmpty && fullName.isNotEmpty) {
+        result[id] = fullName;
+      }
+    }
+    return result;
+  }
+
   Future<void> markAnnouncementsRead({
     required String userId,
     required List<String> announcementIds,

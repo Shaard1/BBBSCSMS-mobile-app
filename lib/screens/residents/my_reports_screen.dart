@@ -33,18 +33,28 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     final user = supabase.auth.currentUser;
 
     // If no user is logged in, stop execution
-    if (user == null) return;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      return;
+    }
 
-    final data = await supabase
-        .from('reports')
-        .select()
-        .eq('user_id', user.id)
-        .order('created_at', ascending: false);
+    try {
+      final data = await supabase
+          .from('reports')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
 
-    setState(() {
-      reports = data;
-      isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        reports = data;
+        isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+    }
   }
 
   Future<void> deleteReport(String reportId) async {
@@ -80,6 +90,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
         .eq('id', reportId)
         .eq('user_id', user.id);
 
+    if (!mounted) return;
     await fetchReports();
   }
 

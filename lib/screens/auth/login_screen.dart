@@ -12,7 +12,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   static const _brandBlue = Color(0xFF0B4F94);
   static const _buttonBlue = Color(0xFF006CBF); // ***** Button color *****
   static const _linkBlue = Color(0xFF003E7E);
@@ -24,9 +25,6 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _errorBorder = Color(0xFFF4C7C3);
   static const _hintColor = Color(0xFF9B9B9B);
   static const _fieldIconColor = Color(0xFF737782);
-  static const _bodyTextColor = Color(0xFF646464);
-
-  static const double _formTopRadius = 24;
   static const double _buttonRadius = 8; // ***** Button border radius *****
 
   final _emailController = TextEditingController();
@@ -38,12 +36,61 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   bool _emailHasError = false;
   bool _passwordHasError = false;
+  late final AnimationController _emailShakeController;
+  late final AnimationController _passwordShakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailShakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _passwordShakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailShakeController.dispose();
+    _passwordShakeController.dispose();
     super.dispose();
+  }
+
+  void _triggerShake({bool email = false, bool password = false}) {
+    if (email) {
+      _emailShakeController
+        ..stop()
+        ..forward(from: 0);
+    }
+    if (password) {
+      _passwordShakeController
+        ..stop()
+        ..forward(from: 0);
+    }
+  }
+
+  Widget _buildShakingField(AnimationController controller, Widget child) {
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, animatedChild) {
+        final offset = 6 * (1 - (controller.value - 0.5).abs() * 2);
+        final direction =
+                controller.value < 0.25 ||
+                    (controller.value >= 0.5 && controller.value < 0.75)
+            ? -1.0
+            : 1.0;
+        return Transform.translate(
+          offset: Offset(offset * direction, 0),
+          child: animatedChild,
+        );
+      },
+    );
   }
 
   Future<void> _login() async {
@@ -55,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (validationMessage != null) {
       setState(() => _errorMessage = validationMessage);
+      _triggerShake(email: _emailHasError, password: _passwordHasError);
       return;
     }
 
@@ -86,6 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailHasError = true;
         _passwordHasError = true;
       });
+      _triggerShake(email: true, password: true);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -323,62 +372,72 @@ class _LoginScreenState extends State<LoginScreen> {
                           top: Radius.circular(28),
                         ),
                       ),
-                      child: Column(
-                        children: [
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Column(
+                          children: [
                           // ***** Login Form: Email Field Start *****
-                          SizedBox(
-                            height: inputFieldHeight,
-                            child: TextField(
-                              controller: _emailController,
-                              style: TextStyle(
-                                color: _emailHasError
-                                    ? _errorColor
-                                    : Colors.black87,
-                              ),
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              onChanged: (_) => _clearErrorForInput(),
-                              decoration: _inputDecoration(
-                                hintText: 'Email',
-                                icon: Icons.mail_outline,
-                                hasError: _emailHasError,
+                          _buildShakingField(
+                            _emailShakeController,
+                            SizedBox(
+                              height: inputFieldHeight,
+                              child: TextField(
+                                controller: _emailController,
+                                style: TextStyle(
+                                  color: _emailHasError
+                                      ? _errorColor
+                                      : Colors.black87,
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                onChanged: (_) => _clearErrorForInput(),
+                                decoration: _inputDecoration(
+                                  hintText: 'Email',
+                                  icon: Icons.mail_outline,
+                                  hasError: _emailHasError,
+                                ),
                               ),
                             ),
                           ),
                           // ***** Login Form: Email Field End *****
                           const SizedBox(height: 14),
                           // ***** Login Form: Password Field Start *****
-                          SizedBox(
-                            height: inputFieldHeight,
-                            child: TextField(
-                              controller: _passwordController,
-                              style: TextStyle(
-                                color: _passwordHasError
-                                    ? _errorColor
-                                    : Colors.black87,
-                              ),
-                              obscureText: !_isPasswordVisible,
-                              textInputAction: TextInputAction.done,
-                              onChanged: (_) => _clearErrorForInput(),
-                              onSubmitted: (_) => _login(),
-                              decoration: _inputDecoration(
-                                hintText: 'Password',
-                                icon: Icons.lock_outline,
-                                hasError: _passwordHasError,
-                                suffixIcon: IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isPasswordVisible = !_isPasswordVisible;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _isPasswordVisible
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: _passwordHasError
-                                        ? _errorColor
-                                        : _fieldIconColor,
-                                    size: 20,
+                          _buildShakingField(
+                            _passwordShakeController,
+                            SizedBox(
+                              height: inputFieldHeight,
+                              child: TextField(
+                                controller: _passwordController,
+                                style: TextStyle(
+                                  color: _passwordHasError
+                                      ? _errorColor
+                                      : Colors.black87,
+                                ),
+                                obscureText: !_isPasswordVisible,
+                                textInputAction: TextInputAction.done,
+                                onChanged: (_) => _clearErrorForInput(),
+                                onSubmitted: (_) => _login(),
+                                decoration: _inputDecoration(
+                                  hintText: 'Password',
+                                  icon: Icons.lock_outline,
+                                  hasError: _passwordHasError,
+                                  suffixIcon: IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _isPasswordVisible =
+                                            !_isPasswordVisible;
+                                      });
+                                    },
+                                    icon: Icon(
+                                      _isPasswordVisible
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      color: _passwordHasError
+                                          ? _errorColor
+                                          : _fieldIconColor,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -498,7 +557,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           // ***** Login Form: Register Prompt End *****
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
