@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/auth_service.dart';
@@ -62,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _triggerShake({bool email = false, bool password = false}) {
+    if (MediaQuery.disableAnimationsOf(context)) return;
     if (email) {
       _emailShakeController
         ..stop()
@@ -75,14 +75,14 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildShakingField(AnimationController controller, Widget child) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
     return AnimatedBuilder(
       animation: controller,
       child: child,
       builder: (context, animatedChild) {
         final offset = 6 * (1 - (controller.value - 0.5).abs() * 2);
-        final direction =
-                controller.value < 0.25 ||
-                    (controller.value >= 0.5 && controller.value < 0.75)
+        final direction = controller.value < 0.25 ||
+                (controller.value >= 0.5 && controller.value < 0.75)
             ? -1.0
             : 1.0;
         return Transform.translate(
@@ -106,6 +106,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    FocusScope.of(context).unfocus();
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -323,249 +324,252 @@ class _LoginScreenState extends State<LoginScreen>
 
     return Scaffold(
       backgroundColor: _pageBackground,
-      resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  SizedBox(height: topSpacing),
-                  SvgPicture.asset(
-                    'lib/assets/Bancao-Bancao Logo.svg',
-                    width: logoSize,
-                    height: logoSize,
+        child: AutofillGroup(
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              SliverToBoxAdapter(
+                  child: Column(children: [
+                SizedBox(height: topSpacing),
+                Image.asset(
+                  'lib/assets/barangay-seal.png',
+                  semanticLabel: 'Barangay Bancao-Bancao seal',
+                  width: logoSize,
+                  height: logoSize,
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Bancao-Bancao App',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.publicSans(
+                    color: _brandBlue,
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.w900,
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Bancao-Bancao App',
+                ),
+                const SizedBox(height: 2),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 42),
+                  child: Text(
+                    'Access your community civic portal\nand stay connected with local\nservices.',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.publicSans(
-                      color: _brandBlue,
-                      fontSize: titleFontSize,
-                      fontWeight: FontWeight.w900,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: const Color(0xFF424751),
+                      fontSize: subtitleFontSize,
+                      fontWeight: FontWeight.w400,
+                      height: 24 / 16,
+                      letterSpacing: 0,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 42),
-                    child: Text(
-                      'Access your community civic portal\nand stay connected with local\nservices.',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: const Color(0xFF424751),
-                        fontSize: subtitleFontSize,
-                        fontWeight: FontWeight.w400,
-                        height: 24 / 16,
-                        letterSpacing: 0,
+                ),
+                SizedBox(height: formTopSpacing),
+              ])),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
+                  decoration: const BoxDecoration(
+                    color: _cardBackground,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(28)),
+                  ),
+                  child: Column(children: [
+                    // ***** Login Form: Email Field Start *****
+                    _buildShakingField(
+                      _emailShakeController,
+                      ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minHeight: inputFieldHeight),
+                        child: TextField(
+                          controller: _emailController,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email
+                          ],
+                          autocorrect: false,
+                          style: TextStyle(
+                            color:
+                                _emailHasError ? _errorColor : Colors.black87,
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => _clearErrorForInput(),
+                          decoration: _inputDecoration(
+                            hintText: 'Email',
+                            icon: Icons.mail_outline,
+                            hasError: _emailHasError,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(height: formTopSpacing),
-                  Expanded(
-                    child: Container(
+                    // ***** Login Form: Email Field End *****
+                    const SizedBox(height: 14),
+                    // ***** Login Form: Password Field Start *****
+                    _buildShakingField(
+                      _passwordShakeController,
+                      ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minHeight: inputFieldHeight),
+                        child: TextField(
+                          controller: _passwordController,
+                          autofillHints: const [AutofillHints.password],
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          style: TextStyle(
+                            color: _passwordHasError
+                                ? _errorColor
+                                : Colors.black87,
+                          ),
+                          obscureText: !_isPasswordVisible,
+                          textInputAction: TextInputAction.done,
+                          onChanged: (_) => _clearErrorForInput(),
+                          onSubmitted: (_) => _login(),
+                          decoration: _inputDecoration(
+                            hintText: 'Password',
+                            icon: Icons.lock_outline,
+                            hasError: _passwordHasError,
+                            suffixIcon: IconButton(
+                              tooltip: _isPasswordVisible
+                                  ? 'Hide password'
+                                  : 'Show password',
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: _passwordHasError
+                                    ? _errorColor
+                                    : _fieldIconColor,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // ***** Login Form: Password Field End *****
+                    // ***** Login Form: Error Message Start *****
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      _buildErrorMessage(),
+                    ],
+                    // ***** Login Form: Error Message End *****
+                    const SizedBox(height: 24),
+                    // ***** Login Form: Login Button Start *****
+                    SizedBox(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
-                      decoration: const BoxDecoration(
-                        color: _cardBackground, // soft white, not too pure white
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(28),
+                      height: buttonHeight,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _buttonBlue,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(_buttonRadius),
+                          ),
                         ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
-                      child: SingleChildScrollView(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        child: Column(
-                          children: [
-                          // ***** Login Form: Email Field Start *****
-                          _buildShakingField(
-                            _emailShakeController,
-                            SizedBox(
-                              height: inputFieldHeight,
-                              child: TextField(
-                                controller: _emailController,
-                                style: TextStyle(
-                                  color: _emailHasError
-                                      ? _errorColor
-                                      : Colors.black87,
-                                ),
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                onChanged: (_) => _clearErrorForInput(),
-                                decoration: _inputDecoration(
-                                  hintText: 'Email',
-                                  icon: Icons.mail_outline,
-                                  hasError: _emailHasError,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // ***** Login Form: Email Field End *****
-                          const SizedBox(height: 14),
-                          // ***** Login Form: Password Field Start *****
-                          _buildShakingField(
-                            _passwordShakeController,
-                            SizedBox(
-                              height: inputFieldHeight,
-                              child: TextField(
-                                controller: _passwordController,
-                                style: TextStyle(
-                                  color: _passwordHasError
-                                      ? _errorColor
-                                      : Colors.black87,
-                                ),
-                                obscureText: !_isPasswordVisible,
-                                textInputAction: TextInputAction.done,
-                                onChanged: (_) => _clearErrorForInput(),
-                                onSubmitted: (_) => _login(),
-                                decoration: _inputDecoration(
-                                  hintText: 'Password',
-                                  icon: Icons.lock_outline,
-                                  hasError: _passwordHasError,
-                                  suffixIcon: IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _isPasswordVisible =
-                                            !_isPasswordVisible;
-                                      });
-                                    },
-                                    icon: Icon(
-                                      _isPasswordVisible
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      color: _passwordHasError
-                                          ? _errorColor
-                                          : _fieldIconColor,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // ***** Login Form: Password Field End *****
-                          // ***** Login Form: Error Message Start *****
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: 12),
-                            _buildErrorMessage(),
-                          ],
-                          // ***** Login Form: Error Message End *****
-                          const SizedBox(height: 24),
-                          // ***** Login Form: Login Button Start *****
-                          SizedBox(
-                            width: double.infinity,
-                            height: buttonHeight,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _buttonBlue,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(_buttonRadius),
-                                ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Login',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          // ***** Login Form: Login Button End *****
-                          const SizedBox(height: 26),
-                          // ***** Login Form: Forgot Password Start *****
-                          TextButton(
-                            onPressed: () {
-                              TopToast.show(
-                                context,
-                                'Forgot password is not available yet.',
-                                backgroundColor: _brandBlue,
-                              );
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: _linkBlue,
-                              minimumSize: Size.zero,
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Forgot password?',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          // ***** Login Form: Forgot Password End *****
-                          const SizedBox(height: 14),
-                          const Divider(
-                            color: Color(0xFFEAEAEA),
-                            thickness: 1,
-                            height: 1,
-                          ),
-                          const SizedBox(height: 16),
-                          // ***** Login Form: Register Prompt Start *****
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 4,
-                            children: [
-                              Text(
-                                "Don't have an account?",
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: const Color(0xFF424751),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  height: 20 / 14,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/register');
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: _linkBlue,
-                                  minimumSize: Size.zero,
-                                  padding: EdgeInsets.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: Text(
-                                  'Register',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    height: 20 / 14,
-                                    letterSpacing: 0,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // ***** Login Form: Register Prompt End *****
-                          ],
+                    ),
+                    // ***** Login Form: Login Button End *****
+                    const SizedBox(height: 26),
+                    // ***** Login Form: Forgot Password Start *****
+                    TextButton(
+                      onPressed: () {
+                        TopToast.show(
+                          context,
+                          'Forgot password is not available yet.',
+                          backgroundColor: _brandBlue,
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: _linkBlue,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        tapTargetSize: MaterialTapTargetSize.padded,
+                      ),
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    // ***** Login Form: Forgot Password End *****
+                    const SizedBox(height: 14),
+                    const Divider(
+                      color: Color(0xFFEAEAEA),
+                      thickness: 1,
+                      height: 1,
+                    ),
+                    const SizedBox(height: 16),
+                    // ***** Login Form: Register Prompt Start *****
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
+                      children: [
+                        Text(
+                          "Don't have an account?",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: const Color(0xFF424751),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            height: 20 / 14,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/register');
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: _linkBlue,
+                            minimumSize: const Size(48, 48),
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                          ),
+                          child: Text(
+                            'Register',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              height: 20 / 14,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // ***** Login Form: Register Prompt End *****
+                  ]),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

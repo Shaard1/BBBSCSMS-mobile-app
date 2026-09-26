@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../widgets/app_status_message.dart';
+import '../../widgets/top_toast.dart';
 
 /// This screen shows ONLY the reports
 /// submitted by the currently logged-in resident.
@@ -16,6 +18,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   final supabase = Supabase.instance.client;
   List reports = [];
   bool isLoading = true;
+  bool _loadFailed = false;
 
   /* ---------------- INIT STATE ---------------- */
 
@@ -48,12 +51,16 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
       if (!mounted) return;
       setState(() {
+        _loadFailed = false;
         reports = data;
         isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+        _loadFailed = true;
+      });
     }
   }
 
@@ -84,14 +91,21 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
     if (shouldDelete != true) return;
 
-    await supabase
-        .from('reports')
-        .delete()
-        .eq('id', reportId)
-        .eq('user_id', user.id);
+    try {
+      await supabase
+          .from('reports')
+          .delete()
+          .eq('id', reportId)
+          .eq('user_id', user.id);
 
-    if (!mounted) return;
-    await fetchReports();
+      if (!mounted) return;
+      await fetchReports();
+    } catch (_) {
+      if (mounted) {
+        TopToast.show(
+            context, 'The report could not be deleted. Please try again.');
+      }
+    }
   }
 
   String _normalizedStatusLabel(String? value) {
@@ -128,57 +142,71 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           ? const Center(child: CircularProgressIndicator())
 
           /* ---------------- EMPTY STATE ---------------- */
-          : reports.isEmpty
-              ? const Center(child: Text("No reports yet."))
+          : RefreshIndicator(
+              onRefresh: fetchReports,
+              child: reports.isEmpty || _loadFailed
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                          AppStatusMessage(
+                            message: _loadFailed
+                                ? 'Reports could not be loaded.'
+                                : 'No reports yet. Your submitted reports will appear here.',
+                            icon: _loadFailed
+                                ? Icons.cloud_off_rounded
+                                : Icons.inbox_outlined,
+                            onRetry: _loadFailed ? fetchReports : null,
+                          ),
+                        ])
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: reports.length,
+                      itemBuilder: (context, index) {
+                        final report = reports[index];
 
-              /* ---------------- REPORT LIST ---------------- */
-              : ListView.builder(
-                  itemCount: reports.length,
-                  itemBuilder: (context, index) {
-                    final report = reports[index];
+                        final description =
+                            report['description'] ?? 'No Description';
 
-                    final description =
-                        report['description'] ?? 'No Description';
+                        final status = _normalizedStatusLabel(
+                          report['status']?.toString(),
+                        );
+                        final reportId = report['id']?.toString() ?? '';
 
-                    final status = _normalizedStatusLabel(
-                      report['status']?.toString(),
-                    );
-                    final reportId = report['id']?.toString() ?? '';
+                        return Card(
+                          margin: const EdgeInsets.all(10),
+                          child: ListTile(
+                            trailing: reportId.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: "Delete report",
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: () => deleteReport(reportId),
+                                  ),
+                            /* ---------------- DESCRIPTION ---------------- */
+                            title: Text(description),
 
-                    return Card(
-                      margin: const EdgeInsets.all(10),
-                      child: ListTile(
-                        trailing: reportId.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: "Delete report",
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.red,
+                            /* ---------------- STATUS SECTION ---------------- */
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Status: $status",
+                                  style: TextStyle(
+                                    color: _statusColor(status),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                onPressed: () => deleteReport(reportId),
-                              ),
-                        /* ---------------- DESCRIPTION ---------------- */
-                        title: Text(description),
-
-                        /* ---------------- STATUS SECTION ---------------- */
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Text(
-                              "Status: $status",
-                              style: TextStyle(
-                                color: _statusColor(status),
-                                fontWeight: FontWeight.bold,
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

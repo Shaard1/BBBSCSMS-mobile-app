@@ -370,10 +370,16 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                         const SizedBox(height: 14),
                         TextField(
                           controller: _newPasswordController,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textInputAction: TextInputAction.next,
                           obscureText: !_showNewPassword,
                           decoration: _fieldDecoration(
                             label: "New password",
                             suffixIcon: IconButton(
+                              tooltip: _showNewPassword
+                                  ? 'Hide password'
+                                  : 'Show password',
                               onPressed: () {
                                 setState(() {
                                   _showNewPassword = !_showNewPassword;
@@ -390,10 +396,16 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: _confirmPasswordController,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textInputAction: TextInputAction.done,
                           obscureText: !_showConfirmPassword,
                           decoration: _fieldDecoration(
                             label: "Confirm new password",
                             suffixIcon: IconButton(
+                              tooltip: _showConfirmPassword
+                                  ? 'Hide password confirmation'
+                                  : 'Show password confirmation',
                               onPressed: () {
                                 setState(() {
                                   _showConfirmPassword = !_showConfirmPassword;

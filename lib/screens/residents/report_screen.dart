@@ -180,12 +180,15 @@ class _ReportScreenState extends State<ReportScreen> {
 
             /* ---------------- SUBMIT BUTTON ---------------- */
 
-            isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-                    onPressed: submitReport,
-                    child: const Text("Submit Report"),
-                  ),
+            ElevatedButton(
+              onPressed: isLoading ? null : submitReport,
+              child: isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Submit Report'),
+            ),
           ],
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../widgets/top_toast.dart';
+import '../../widgets/app_tap_surface.dart';
 import '../crop_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -68,6 +69,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _pickProfileImage() async {
     await showModalBottomSheet<void>(
       context: context,
+      useSafeArea: true,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : const AnimationStyle(
+              duration: Duration(milliseconds: 240),
+              reverseDuration: Duration(milliseconds: 180)),
       builder: (sheetContext) {
         return SafeArea(
           child: Column(
@@ -335,7 +342,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 18),
                     Center(
-                      child: GestureDetector(
+                      child: AppTapSurface(
+                        label: 'Change profile photo',
+                        borderRadius: BorderRadius.circular(80),
                         onTap: _pickProfileImage,
                         child: Container(
                           width: 122,
@@ -400,6 +409,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _fullNameController,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
                       textCapitalization: TextCapitalization.words,
                       style: const TextStyle(
                         color: Color(0xFF424751),
@@ -423,6 +434,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _contactController,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [
+                        AutofillHints.telephoneNumberNational
+                      ],
                       keyboardType: TextInputType.number,
                       style: const TextStyle(
                         color: Color(0xFF424751),

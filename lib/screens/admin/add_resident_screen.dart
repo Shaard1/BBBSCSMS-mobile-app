@@ -125,6 +125,10 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              isExpanded: true,
+              menuMaxHeight: 320,
+              borderRadius: BorderRadius.circular(12),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
               initialValue: civilStatus,
               decoration: const InputDecoration(labelText: 'Civil Status'),
               items: ['Single', 'Married', 'Widowed', 'Separated']

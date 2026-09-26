@@ -16,16 +16,23 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleAspectFit" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="VvR-2j-75z">
+                            <imageView opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleAspectFit" image="BancaoConnect" translatesAutoresizingMaskIntoConstraints="NO" id="VvR-2j-75z">
                                 <rect key="frame" x="52.5" y="98.5" width="270" height="280"/>
                             </imageView>
+                            <imageView opaque="NO" clipsSubviews="YES" contentMode="scaleAspectFit" image="BarangaySeal" translatesAutoresizingMaskIntoConstraints="NO" id="seal-view">
+                                <rect key="frame" x="149.5" y="360" width="76" height="76"/>
+                            </imageView>
                         </subviews>
-                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.972549" green="0.980392" blue="0.988235" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
                             <constraint firstItem="VvR-2j-75z" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="0R3-vg-jew"/>
-                            <constraint firstItem="VvR-2j-75z" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="KBB-F7-ULJ"/>
-                            <constraint firstItem="VvR-2j-75z" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.8" id="Ud0-Ir-Z6v"/>
-                            <constraint firstItem="VvR-2j-75z" firstAttribute="height" secondItem="Ze5-6b-2t3" secondAttribute="height" multiplier="0.5" id="pW7-Ft-U6P"/>
+                            <constraint firstItem="VvR-2j-75z" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-72" id="KBB-F7-ULJ"/>
+                            <constraint firstItem="VvR-2j-75z" firstAttribute="width" constant="88" id="Ud0-Ir-Z6v"/>
+                            <constraint firstItem="VvR-2j-75z" firstAttribute="height" constant="88" id="pW7-Ft-U6P"/>
+                            <constraint firstItem="seal-view" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="seal-center-x"/>
+                            <constraint firstItem="seal-view" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="72" id="seal-center-y"/>
+                            <constraint firstItem="seal-view" firstAttribute="width" constant="76" id="seal-width"/>
+                            <constraint firstItem="seal-view" firstAttribute="height" constant="76" id="seal-height"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -35,6 +42,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchImage" width="600" height="600"/>
+        <image name="BancaoConnect" width="88" height="88"/>
+        <image name="BarangaySeal" width="76" height="76"/>
     </resources>
 </document>

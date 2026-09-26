@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin/admin_dashboard_screen.dart';
 import 'residents/resident_dashboard_screen.dart';
 import '../services/auth_service.dart';
+import '../widgets/app_launch_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /* ---------------- LOAD PROFILE ---------------- */
 
   Future<void> _loadProfile() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
     try {
       final user = Supabase.instance.client.auth.currentUser;
 
@@ -60,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
+      if (!mounted) return;
       setState(() {
         fullName = data['full_name'] ?? '';
         role = data['role'] ?? '';
@@ -83,12 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
     /* ---------------- LOADING STATE ---------------- */
 
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF8FAFC),
-        body: Center(
-          child: _StartupLoadingDots(),
-        ),
-      );
+      return const AppLaunchView();
     }
 
     if (errorMessage != null) {
@@ -96,10 +95,18 @@ class _HomeScreenState extends State<HomeScreen> {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              errorMessage!,
-              textAlign: TextAlign.center,
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(errorMessage!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                  onPressed: _loadProfile,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again')),
+              TextButton(
+                  onPressed: () =>
+                      Navigator.pushReplacementNamed(context, '/login'),
+                  child: const Text('Back to login')),
+            ]),
           ),
         ),
       );
@@ -130,58 +137,5 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-  }
-}
-
-class _StartupLoadingDots extends StatefulWidget {
-  const _StartupLoadingDots();
-
-  @override
-  State<_StartupLoadingDots> createState() => _StartupLoadingDotsState();
-}
-
-class _StartupLoadingDotsState extends State<_StartupLoadingDots> {
-  static const Color _brandBlue = Color(0xFF0F84D7);
-
-  Timer? _timer;
-  int _activeDot = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 420), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _activeDot = (_activeDot + 1) % 3;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final isActive = index == _activeDot;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: EdgeInsets.only(right: index == 2 ? 0 : 10),
-          width: isActive ? 12 : 11,
-          height: isActive ? 12 : 11,
-          decoration: BoxDecoration(
-            color: isActive
-                ? _brandBlue.withValues(alpha: 0.9)
-                : const Color(0xFFD9EBFF),
-            shape: BoxShape.circle,
-          ),
-        );
-      }),
-    );
   }
 }

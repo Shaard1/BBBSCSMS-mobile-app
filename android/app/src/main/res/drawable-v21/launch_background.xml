@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/launch_brand2" />
+    <item android:drawable="@color/launch_background" />
+    <item android:width="88dp" android:height="88dp" android:gravity="center" android:bottom="144dp">
+        <bitmap android:gravity="fill" android:src="@drawable/bancao_connect" />
+    </item>
+    <item android:width="76dp" android:height="76dp" android:gravity="center" android:top="144dp">
+        <bitmap android:gravity="fill" android:src="@drawable/barangay_seal" />
     </item>
 </layer-list>

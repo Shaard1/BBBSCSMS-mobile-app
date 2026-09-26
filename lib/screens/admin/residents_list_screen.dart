@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../widgets/top_toast.dart';
+import '../../widgets/app_status_message.dart';
 import 'add_resident_screen.dart';
 
 class ResidentsListScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
 
   List<Map<String, dynamic>> residents = [];
   bool isLoading = true;
+  bool _loadFailed = false;
   String? userRole;
 
   void _showTopToast(String message) {
@@ -71,13 +73,17 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       if (!mounted) return;
 
       setState(() {
+        _loadFailed = false;
         residents = List<Map<String, dynamic>>.from(data);
         isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
 
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+        _loadFailed = true;
+      });
       _showTopToast('Unable to load residents right now.');
     }
   }
@@ -181,72 +187,93 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : residents.isEmpty
-              ? const Center(child: Text('No residents found.'))
-              : RefreshIndicator(
-                  onRefresh: fetchResidents,
-                  child: ListView.builder(
-                    itemCount: residents.length,
-                    itemBuilder: (context, index) {
-                      final resident = residents[index];
-                      final status = resident['status'] ?? 'pending';
+          : RefreshIndicator(
+              onRefresh: initializeData,
+              child: residents.isEmpty || _loadFailed
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                          AppStatusMessage(
+                            message: _loadFailed
+                                ? 'Residents could not be loaded.'
+                                : 'No residents found.',
+                            icon: _loadFailed
+                                ? Icons.cloud_off_rounded
+                                : Icons.people_outline,
+                            onRetry: _loadFailed ? initializeData : null,
+                          ),
+                        ])
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: residents.length,
+                      itemBuilder: (context, index) {
+                        final resident = residents[index];
+                        final status = resident['status'] ?? 'pending';
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        child: ListTile(
-                          title: Text(
-                            resident['full_name'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Address: ${resident['address'] ?? ''}"),
-                              Text(
-                                  "Contact: ${resident['contact_number'] ?? ''}"),
-                              const SizedBox(height: 6),
-                              buildStatusBadge(status),
-                            ],
-                          ),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'approve') {
-                                updateStatus(resident['id'], 'approved');
-                              } else if (value == 'reject') {
-                                updateStatus(resident['id'], 'rejected');
-                              } else if (value == 'delete') {
-                                deleteResident(resident['id']);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              if (status == 'pending' && userRole == 'admin')
-                                const PopupMenuItem(
-                                  value: 'approve',
-                                  child: Text('Approve'),
-                                ),
-                              if (status == 'pending' && userRole == 'admin')
-                                const PopupMenuItem(
-                                  value: 'reject',
-                                  child: Text('Reject'),
-                                ),
-                              if (userRole == 'admin')
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
+                          child: ListTile(
+                            title: Text(
+                              resident['full_name'] ?? '',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Address: ${resident['address'] ?? ''}"),
+                                Text(
+                                    "Contact: ${resident['contact_number'] ?? ''}"),
+                                const SizedBox(height: 6),
+                                buildStatusBadge(status),
+                              ],
+                            ),
+                            trailing: userRole != 'admin'
+                                ? null
+                                : PopupMenuButton<String>(
+                                    tooltip: 'Resident actions',
+                                    onSelected: (value) {
+                                      if (value == 'approve') {
+                                        updateStatus(
+                                            resident['id'], 'approved');
+                                      } else if (value == 'reject') {
+                                        updateStatus(
+                                            resident['id'], 'rejected');
+                                      } else if (value == 'delete') {
+                                        deleteResident(resident['id']);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      if (status == 'pending' &&
+                                          userRole == 'admin')
+                                        const PopupMenuItem(
+                                          value: 'approve',
+                                          child: Text('Approve'),
+                                        ),
+                                      if (status == 'pending' &&
+                                          userRole == 'admin')
+                                        const PopupMenuItem(
+                                          value: 'reject',
+                                          child: Text('Reject'),
+                                        ),
+                                      if (userRole == 'admin')
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(
+                                            'Delete',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                ),
-                            ],
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                        );
+                      },
+                    ),
+            ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () async {

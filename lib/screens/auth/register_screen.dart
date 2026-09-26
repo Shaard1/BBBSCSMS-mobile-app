@@ -12,6 +12,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../crop_screen.dart';
 import 'register_verification_screen.dart';
 import '../../widgets/top_toast.dart';
+import '../../widgets/app_selection_field.dart';
+import '../../widgets/app_tap_surface.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -60,8 +62,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  String? _expandedDropdown;
-  String? _hoveredDropdown;
   final Map<String, String?> _fieldErrors = {};
   late final Map<String, AnimationController> _fieldShakeControllers;
 
@@ -124,6 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   String? _errorFor(String fieldKey) => _fieldErrors[fieldKey];
 
   void _triggerFieldShake(String fieldKey) {
+    if (MediaQuery.disableAnimationsOf(context)) return;
     final controller = _fieldShakeControllers[fieldKey];
     controller
       ?..stop()
@@ -132,16 +133,17 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Widget _buildShakingField(String fieldKey, Widget child) {
     final controller = _fieldShakeControllers[fieldKey];
-    if (controller == null) return child;
+    if (MediaQuery.disableAnimationsOf(context) || controller == null) {
+      return child;
+    }
 
     return AnimatedBuilder(
       animation: controller,
       child: child,
       builder: (context, animatedChild) {
         final offset = 6 * (1 - (controller.value - 0.5).abs() * 2);
-        final direction =
-                controller.value < 0.25 ||
-                    (controller.value >= 0.5 && controller.value < 0.75)
+        final direction = controller.value < 0.25 ||
+                (controller.value >= 0.5 && controller.value < 0.75)
             ? -1.0
             : 1.0;
         return Transform.translate(
@@ -337,7 +339,11 @@ class _RegisterScreenState extends State<RegisterScreen>
       return null;
     }
 
-    if (day < 1 || day > 31 || month < 1 || month > 12 || yearText.length != 4) {
+    if (day < 1 ||
+        day > 31 ||
+        month < 1 ||
+        month > 12 ||
+        yearText.length != 4) {
       return null;
     }
 
@@ -531,13 +537,14 @@ class _RegisterScreenState extends State<RegisterScreen>
       };
 
       try {
-        await Supabase.instance.client.from('residents').insert(residentPayload);
+        await Supabase.instance.client
+            .from('residents')
+            .insert(residentPayload);
       } catch (insertError) {
         // Backward-compat: if new columns are not migrated yet, fall back
         // to legacy single-image payload so registration can still continue.
         final message = insertError.toString().toLowerCase();
-        final missingNewColumns =
-            message.contains('email') ||
+        final missingNewColumns = message.contains('email') ||
             message.contains('birth_day') ||
             message.contains('birth_month') ||
             message.contains('birth_year') ||
@@ -721,183 +728,25 @@ class _RegisterScreenState extends State<RegisterScreen>
     required Widget icon,
     required List<String> options,
     required ValueChanged<String> onSelected,
-  }) {
-    final isExpanded = _expandedDropdown == fieldKey;
-    final isHovered = _hoveredDropdown == fieldKey;
-    final errorText = _errorFor(fieldKey);
-    final hasError = errorText != null && errorText.isNotEmpty;
-    final borderColor = hasError
-        ? const Color(0xFFFF4D4F)
-        : isExpanded
-            ? const Color(0xFF6E7684)
-            : isHovered
-                ? const Color(0xFFD5D9E1)
-                : _borderColor;
-
-    return _buildShakingField(
-      fieldKey,
-      MouseRegion(
-      onEnter: (_) => setState(() => _hoveredDropdown = fieldKey),
-      onExit: (_) {
-        if (_hoveredDropdown == fieldKey) {
-          setState(() => _hoveredDropdown = null);
-        }
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(isExpanded ? 12 : 12),
-              onTap: () {
-                setState(() {
-                  _expandedDropdown = isExpanded ? null : fieldKey;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 18,
-                ),
-                decoration: BoxDecoration(
-                  color: isHovered || isExpanded
-                      ? const Color(0xFFF1F3F6)
-                      : _cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: borderColor,
-                    width: 1.6,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    ColorFiltered(
-                      colorFilter: ColorFilter.mode(
-                        hasError ? const Color(0xFFFF4D4F) : _fieldIconColor,
-                        BlendMode.srcIn,
-                      ),
-                      child: icon,
-                    ),
-                    Expanded(
-                      child: Text(
-                        value ?? hint,
-                        style: TextStyle(
-                          color: hasError
-                              ? const Color(0xFFFF4D4F)
-                              : value == null
-                                  ? const Color(0xFF9DA5AE)
-                                  : const Color(0xFF2C2F32),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    AnimatedRotation(
-                      turns: isExpanded ? 0.5 : 0.0,
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: hasError
-                            ? const Color(0xFFFF4D4F)
-                            : const Color(0xFF7E8796),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) {
-              return SizeTransition(
-                sizeFactor: animation,
-                axisAlignment: -1.0,
-                child: FadeTransition(
-                  opacity: animation,
-                  child: child,
-                ),
-              );
-            },
-            child: isExpanded
-                ? Padding(
-                    key: const ValueKey('dropdown_open'),
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFD9DFE7),
-                          width: 1.6,
-                        ),
-                      ),
-                      child: Column(
-                        children: options.map((option) {
-                          return Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () {
-                                setState(() {
-                                  _expandedDropdown = null;
-                                });
-                                onSelected(option);
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 16,
-                                ),
-                                child: Text(
-                                  option,
-                                  style: const TextStyle(
-                                    color: Color(0xFF3F4854),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(key: ValueKey('dropdown_closed')),
-          ),
-          SizedBox(
-            height: 24,
-            child: hasError
-                ? Padding(
-                    padding: const EdgeInsets.only(left: 4, top: 6),
-                    child: Text(
-                      errorText,
-                      style: const TextStyle(
-                        color: Color(0xFFFF4D4F),
-                        fontSize: 12,
-                      ),
-                    ),
-                  )
-                : null,
-          ),
-        ],
-      ),
-    ));
-  }
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: _buildShakingField(
+            fieldKey,
+            AppSelectionField(
+              label: hint,
+              value: value,
+              leading: icon,
+              options: options,
+              onSelected: onSelected,
+              errorText: _errorFor(fieldKey),
+            )),
+      );
 
   Widget _buildFieldError(String fieldKey) {
     final errorText = _errorFor(fieldKey);
-    return SizedBox(
-      height: 24,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 24),
       child: errorText == null || errorText.isEmpty
           ? null
           : Padding(
@@ -936,14 +785,15 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           ),
           const SizedBox(width: 10),
-          Text(
+          Expanded(
+              child: Text(
             title,
             style: const TextStyle(
               color: _brandBlue,
               fontSize: 20,
               fontWeight: FontWeight.w700,
             ),
-          ),
+          )),
         ],
       ),
     );
@@ -1001,7 +851,9 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget _buildProfilePhotoPicker() {
     return Column(
       children: [
-        GestureDetector(
+        AppTapSurface(
+          label: 'Choose profile photo',
+          borderRadius: BorderRadius.circular(80),
           onTap: _pickProfileImage,
           child: Container(
             width: 124,
@@ -1386,6 +1238,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                         'password',
                         TextField(
                           controller: _passwordController,
+                          autocorrect: false,
+                          enableSuggestions: false,
                           style: _fieldInputTextStyle('password'),
                           obscureText: !_isPasswordVisible,
                           textInputAction: TextInputAction.next,
@@ -1399,6 +1253,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                             hasError: _errorFor('password') != null,
                             suffixIcon: IconButton(
+                              tooltip: _isPasswordVisible
+                                  ? 'Hide password'
+                                  : 'Show password',
                               onPressed: () {
                                 setState(() {
                                   _isPasswordVisible = !_isPasswordVisible;
@@ -1427,6 +1284,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                         'confirm_password',
                         TextField(
                           controller: _confirmPasswordController,
+                          autocorrect: false,
+                          enableSuggestions: false,
                           style: _fieldInputTextStyle('confirm_password'),
                           obscureText: !_isConfirmPasswordVisible,
                           textInputAction: TextInputAction.done,
@@ -1442,6 +1301,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                             hasError: _errorFor('confirm_password') != null,
                             suffixIcon: IconButton(
+                              tooltip: _isConfirmPasswordVisible
+                                  ? 'Hide password'
+                                  : 'Show password',
                               onPressed: () {
                                 setState(() {
                                   _isConfirmPasswordVisible =
@@ -1466,78 +1328,80 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
               ),
               const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _continueToVerification,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _brandBlue,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Continue to Verification',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Icon(Icons.arrow_forward_rounded, size: 18),
-                                ],
-                              ),
-                      ),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 54),
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _continueToVerification,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _brandBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 18),
-                    Center(
-                      child: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 4,
-                        children: [
-                          const Text(
-                            'Already have an account?',
-                            style: TextStyle(
-                              color: _bodyColor,
-                              fontSize: 13,
-                            ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
                           ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(context, '/login');
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: _brandBlue,
-                              minimumSize: Size.zero,
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Log in here',
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                                child: Text(
+                              'Continue to Verification',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
                               ),
-                            ),
-                          ),
-                        ],
+                            )),
+                            SizedBox(width: 6),
+                            Icon(Icons.arrow_forward_rounded, size: 18),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Center(
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  children: [
+                    const Text(
+                      'Already have an account?',
+                      style: TextStyle(
+                        color: _bodyColor,
+                        fontSize: 13,
                       ),
                     ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/login');
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: _brandBlue,
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Log in here',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

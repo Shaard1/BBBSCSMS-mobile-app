@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import '../../widgets/app_tap_surface.dart';
+import '../../widgets/top_toast.dart';
 
 class IdCameraCaptureScreen extends StatefulWidget {
   const IdCameraCaptureScreen({super.key});
@@ -73,6 +75,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isCapturing = false);
+      TopToast.show(context, 'Photo could not be captured. Please try again.');
     }
   }
 
@@ -101,17 +104,21 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen> {
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 12,
                   child: IconButton(
+                    tooltip: 'Close camera',
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    icon:
+                        const Icon(Icons.close, color: Colors.white, size: 30),
                   ),
                 ),
                 Positioned(
-                  bottom: 34,
+                  bottom: MediaQuery.paddingOf(context).bottom + 24,
                   left: 0,
                   right: 0,
                   child: Center(
-                    child: GestureDetector(
-                      onTap: _capture,
+                    child: AppTapSurface(
+                      label: 'Take ID photo',
+                      borderRadius: BorderRadius.circular(40),
+                      onTap: _isCapturing ? null : _capture,
                       child: Container(
                         width: 74,
                         height: 74,
@@ -250,11 +257,15 @@ class _FrameCornerPainter extends CustomPainter {
     canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(cornerLen, 0), p);
     canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(0, cornerLen), p);
     // top-right
-    canvas.drawLine(rect.topRight, rect.topRight + const Offset(-cornerLen, 0), p);
-    canvas.drawLine(rect.topRight, rect.topRight + const Offset(0, cornerLen), p);
+    canvas.drawLine(
+        rect.topRight, rect.topRight + const Offset(-cornerLen, 0), p);
+    canvas.drawLine(
+        rect.topRight, rect.topRight + const Offset(0, cornerLen), p);
     // bottom-left
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(cornerLen, 0), p);
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(0, -cornerLen), p);
+    canvas.drawLine(
+        rect.bottomLeft, rect.bottomLeft + const Offset(cornerLen, 0), p);
+    canvas.drawLine(
+        rect.bottomLeft, rect.bottomLeft + const Offset(0, -cornerLen), p);
     // bottom-right
     canvas.drawLine(
       rect.bottomRight,

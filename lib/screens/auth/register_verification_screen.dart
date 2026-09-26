@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'id_camera_capture_screen.dart';
+import '../../widgets/app_selection_field.dart';
 
-typedef SubmitRegistrationCallback =
-    Future<String?> Function({
-      required String idType,
-      required File frontIdImage,
-      required File backIdImage,
-    });
+typedef SubmitRegistrationCallback = Future<String?> Function({
+  required String idType,
+  required File frontIdImage,
+  required File backIdImage,
+});
 
 class RegisterVerificationScreen extends StatefulWidget {
   const RegisterVerificationScreen({
@@ -31,7 +31,8 @@ class RegisterVerificationScreen extends StatefulWidget {
       _RegisterVerificationScreenState();
 }
 
-class _RegisterVerificationScreenState extends State<RegisterVerificationScreen> {
+class _RegisterVerificationScreenState
+    extends State<RegisterVerificationScreen> {
   static const _brandBlue = Color(0xFF006CBF);
   static const _pageBackground = Color(0xFFF8FAFC);
   static const _borderColor = Color(0xFFE6E8ED);
@@ -44,8 +45,6 @@ class _RegisterVerificationScreenState extends State<RegisterVerificationScreen>
   File? _backIdImage;
   String? _error;
   bool _isSubmitting = false;
-  bool _idTypeExpanded = false;
-  bool _idTypeHovered = false;
 
   @override
   void initState() {
@@ -63,6 +62,12 @@ class _RegisterVerificationScreenState extends State<RegisterVerificationScreen>
   Future<void> _pickIdImage({required bool isFront}) async {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : const AnimationStyle(
+              duration: Duration(milliseconds: 240),
+              reverseDuration: Duration(milliseconds: 180)),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -324,122 +329,19 @@ class _RegisterVerificationScreenState extends State<RegisterVerificationScreen>
     );
   }
 
-  Widget _buildIdTypeDropdown() {
-    const options = [
-      'Barangay ID',
-      'Student ID',
-      'Postal ID',
-      'Driver License',
-      'PhilSys ID',
-    ];
-
-    final borderColor = _idTypeExpanded
-        ? _brandBlue
-        : _idTypeHovered
-            ? const Color(0xFFD5D9E1)
-            : _borderColor;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _idTypeHovered = true),
-      onExit: (_) => setState(() => _idTypeHovered = false),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => setState(() => _idTypeExpanded = !_idTypeExpanded),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                decoration: BoxDecoration(
-                  color: _idTypeHovered || _idTypeExpanded
-                      ? const Color(0xFFF1F3F6)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor, width: 1.6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.badge_outlined, color: _fieldIconColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _idType ?? 'ID Type',
-                        style: const TextStyle(
-                          color: Color(0xFF484D51),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    AnimatedRotation(
-                      turns: _idTypeExpanded ? 0.5 : 0.0,
-                      duration: const Duration(milliseconds: 180),
-                      child: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: Color(0xFF7E8796),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: _idTypeExpanded
-                ? Container(
-                    key: const ValueKey('idtype_open'),
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(top: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD9DFE7), width: 1.4),
-                    ),
-                    child: Column(
-                      children: options.map((option) {
-                        final isSelected = option == _idType;
-                        return Material(
-                          color: isSelected
-                              ? const Color(0xFFE5E7EB)
-                              : Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                _idType = option;
-                                _idTypeExpanded = false;
-                              });
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              child: Text(
-                                option,
-                                style: const TextStyle(
-                                  color: Color(0xFF1F2937),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  )
-                : const SizedBox.shrink(key: ValueKey('idtype_closed')),
-          ),
+  Widget _buildIdTypeDropdown() => AppSelectionField(
+        label: 'ID Type',
+        value: _idType,
+        leading: const Icon(Icons.badge_outlined, color: _fieldIconColor),
+        options: const [
+          'Barangay ID',
+          'Student ID',
+          'Postal ID',
+          'Driver License',
+          'PhilSys ID'
         ],
-      ),
-    );
-  }
+        onSelected: (value) => setState(() => _idType = value),
+      );
 
   @override
   Widget build(BuildContext context) {

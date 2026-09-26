@@ -26,12 +26,6 @@ class _CropScreenState extends State<CropScreen> {
   bool _isCropping = false;
 
   Future<void> _saveCroppedImage(CropResult result) async {
-    if (_isCropping) return;
-
-    setState(() {
-      _isCropping = true;
-    });
-
     try {
       if (result is CropSuccess) {
         final image = result.croppedImage;
@@ -50,6 +44,7 @@ class _CropScreenState extends State<CropScreen> {
         Navigator.pop(context, croppedFile);
       } else {
         if (!mounted) return;
+        setState(() => _isCropping = false);
         TopToast.show(context, "Failed to crop image. Please try again.");
       }
     } catch (_) {
@@ -77,12 +72,14 @@ class _CropScreenState extends State<CropScreen> {
               onCropped: _saveCroppedImage,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.all(20),
             child: ElevatedButton(
               onPressed: _isCropping
                   ? null
                   : () {
+                      setState(() => _isCropping = true);
                       controller.crop();
                     },
               child: _isCropping

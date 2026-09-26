@@ -23,7 +23,8 @@ class ReportLocationPickerScreen extends StatefulWidget {
       _ReportLocationPickerScreenState();
 }
 
-class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen> {
+class _ReportLocationPickerScreenState
+    extends State<ReportLocationPickerScreen> {
   static const LatLng _palawanCenter = LatLng(9.7392, 118.7353);
 
   final MapController _mapController = MapController();
@@ -39,7 +40,8 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
   void initState() {
     super.initState();
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
-      _selectedPoint = LatLng(widget.initialLatitude!, widget.initialLongitude!);
+      _selectedPoint =
+          LatLng(widget.initialLatitude!, widget.initialLongitude!);
     }
   }
 
@@ -101,8 +103,10 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
       });
 
       if (results.isNotEmpty) {
-        final firstLat = double.tryParse(results.first['lat']?.toString() ?? '');
-        final firstLng = double.tryParse(results.first['lon']?.toString() ?? '');
+        final firstLat =
+            double.tryParse(results.first['lat']?.toString() ?? '');
+        final firstLng =
+            double.tryParse(results.first['lon']?.toString() ?? '');
 
         if (firstLat != null && firstLng != null) {
           _mapController.move(LatLng(firstLat, firstLng), 16);
@@ -280,9 +284,10 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
                 itemCount: _searchResults.length,
                 itemBuilder: (_, index) {
                   final item = _searchResults[index];
-                  final name = item['display_name']?.toString() ?? 'Unknown place';
+                  final name =
+                      item['display_name']?.toString() ?? 'Unknown place';
                   return ListTile(
-                    dense: true,
+                    minVerticalPadding: 12,
                     leading: const Icon(Icons.location_on_outlined),
                     title: Text(
                       name,
@@ -306,6 +311,7 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
                     initialCenter: initialPoint,
                     initialZoom: 13,
                     onTap: (_, point) {
+                      FocusScope.of(context).unfocus();
                       setState(() {
                         _selectedPoint = point;
                       });
@@ -352,12 +358,14 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _isFetchingCurrent ? null : _useCurrentLocation,
+                        onPressed:
+                            _isFetchingCurrent ? null : _useCurrentLocation,
                         icon: _isFetchingCurrent
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.my_location_outlined),
                         label: const Text("Use Current"),
@@ -366,7 +374,8 @@ class _ReportLocationPickerScreenState extends State<ReportLocationPickerScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _selectedPoint == null ? null : _confirmLocation,
+                        onPressed:
+                            _selectedPoint == null ? null : _confirmLocation,
                         icon: const Icon(Icons.check_circle_outline),
                         label: const Text("Confirm Location"),
                       ),

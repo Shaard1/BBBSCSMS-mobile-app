@@ -90,7 +90,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         /* ---------------- IMAGE ---------------- */
 
                         if (report['image_url'] != null)
-                          Image.network(report['image_url']),
+                          Image.network(report['image_url'],
+                              errorBuilder: (_, error, stackTrace) =>
+                                  const Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child:
+                                          Icon(Icons.broken_image_outlined))),
                         const SizedBox(height: 8),
 
                         /* ---------------- STATUS ---------------- */
@@ -100,14 +105,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                         /* ---------------- ACTION BUTTONS ---------------- */
 
-                        Row(
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
                             ElevatedButton(
                               onPressed: () =>
                                   updateStatus(report['id'], 'in_process'),
                               child: const Text("In Process"),
                             ),
-                            const SizedBox(width: 10),
                             ElevatedButton(
                               onPressed: () =>
                                   updateStatus(report['id'], 'completed'),

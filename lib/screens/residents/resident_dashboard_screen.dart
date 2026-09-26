@@ -14,6 +14,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/announcement_model.dart';
 import '../../services/announcement_service.dart';
 import '../../widgets/top_toast.dart';
+import '../../widgets/app_selection_field.dart';
+import '../../widgets/app_tap_surface.dart';
+import '../../widgets/app_status_message.dart';
+import '../../widgets/app_content_switcher.dart';
+import '../../core/app_interactions.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_security_screen.dart';
 import 'report_location_picker_screen.dart';
@@ -116,7 +121,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   static const Color _pageBackground = Color(0xFFF8F9FA);
   static const double _pageHorizontalPadding = 16;
   static const double _topBarTopPadding = 18;
-  static const double _topActionSize = 40;
+  static const double _topActionSize = 48;
   static const double _bottomNavIconSize = 31;
 
   final List<String> _categories = const [
@@ -133,6 +138,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   _ResidentServiceView _serviceView = _ResidentServiceView.menu;
 
   bool _isLoadingReports = true;
+  bool _reportsLoadFailed = false;
+  bool _documentsLoadFailed = false;
+  bool _announcementsLoadFailed = false;
   bool _isLoadingAnnouncements = true;
   bool _isSubmittingReport = false;
   bool _isSubmittingCertificateRequest = false;
@@ -320,6 +328,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
       if (!mounted) return;
       setState(() {
+        _announcementsLoadFailed = false;
         _announcements = announcements;
         _readAnnouncementIds = readIds;
         _announcementAuthorNames = authorNames;
@@ -328,9 +337,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _announcements = [];
-        _readAnnouncementIds = {};
-        _announcementAuthorNames = {};
+        _announcementsLoadFailed = true;
         _isLoadingAnnouncements = false;
       });
     }
@@ -436,6 +443,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
+        _reportsLoadFailed = false;
         _reports = List<Map<String, dynamic>>.from(data).map((report) {
           return {
             ...report,
@@ -445,9 +453,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _reports = [];
-      });
+      setState(() => _reportsLoadFailed = true);
     }
   }
 
@@ -471,7 +477,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        _documentRequests = List<Map<String, dynamic>>.from(data).map((request) {
+        _documentsLoadFailed = false;
+        _documentRequests =
+            List<Map<String, dynamic>>.from(data).map((request) {
           return {
             ...request,
             'activity_type': 'document_request',
@@ -480,9 +488,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _documentRequests = [];
-      });
+      setState(() => _documentsLoadFailed = true);
     }
   }
 
@@ -760,10 +766,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     TopToast.show(context, message, backgroundColor: _brandBlue);
   }
 
-  Future<void> _runAfterTapFeedback(
+  Future<void> _runAction(
     FutureOr<void> Function() action,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 140));
     if (!mounted) return;
     await action();
   }
@@ -1071,7 +1076,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   itemCount: images.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    return GestureDetector(
+                    return AppTapSurface(
                       onTap: () => _showSwipeImageGallery(
                         images,
                         initialIndex: index,
@@ -1168,7 +1173,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required List<String> imageUrls,
     required String status,
   }) {
-    return GestureDetector(
+    return AppTapSurface(
       onTap: imageUrl == null
           ? null
           : () => _showSwipeImageGallery(
@@ -1966,7 +1971,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                                 });
                               },
                               itemBuilder: (context, index) {
-                                return GestureDetector(
+                                return AppTapSurface(
                                   onTap: () => _showSwipeImageGallery(
                                     imageUrls,
                                     initialIndex: index,
@@ -2027,7 +2032,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                                 itemBuilder: (context, index) {
                                   final isSelected =
                                       selectedImageIndex == index;
-                                  return GestureDetector(
+                                  return AppTapSurface(
                                     onTap: () {
                                       pageController.animateToPage(
                                         index,
@@ -2334,7 +2339,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: appMotionDuration(context, 160),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? _brandBlue : const Color(0xFFEDEFF1),
@@ -2362,7 +2367,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       color: Colors.white,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(
+        onTap: () => _runAction(
           () => _showAnnouncementDetails(announcement),
         ),
         borderRadius: BorderRadius.circular(8),
@@ -2667,32 +2672,28 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ? _certificateControllers['full_name']!.text.trim()
               : _fullName,
       'certificate_key': certificate['key'] as String? ?? '',
-      'certificate_title': certificate['title'] as String? ?? 'Document Request',
-      'certificate_variant':
-          certificate['key'] == 'good_moral_residency'
-              ? _selectedCertificateVariant
-              : null,
+      'certificate_title':
+          certificate['title'] as String? ?? 'Document Request',
+      'certificate_variant': certificate['key'] == 'good_moral_residency'
+          ? _selectedCertificateVariant
+          : null,
       'contact_number': _certificateControllers['contact_number']!.text.trim(),
       'email': _certificateControllers['email']!.text.trim(),
       'address': _certificateControllers['address']!.text.trim(),
       'payment_method': _selectedCertificatePaymentMethod,
-      'payment_receiver_name':
-          _selectedCertificatePaymentMethod == 'GCash'
-              ? _demoGcashReceiverName
-              : null,
-      'payment_receiver_number':
-          _selectedCertificatePaymentMethod == 'GCash'
-              ? _demoGcashReceiverNumber
-              : null,
-      'payment_reference':
-          _selectedCertificatePaymentMethod == 'GCash'
-              ? _certificateControllers['payment_reference']!.text.trim()
-              : null,
+      'payment_receiver_name': _selectedCertificatePaymentMethod == 'GCash'
+          ? _demoGcashReceiverName
+          : null,
+      'payment_receiver_number': _selectedCertificatePaymentMethod == 'GCash'
+          ? _demoGcashReceiverNumber
+          : null,
+      'payment_reference': _selectedCertificatePaymentMethod == 'GCash'
+          ? _certificateControllers['payment_reference']!.text.trim()
+          : null,
       'payment_proof_url': paymentProofUrl,
-      'payment_submitted_at':
-          _selectedCertificatePaymentMethod == 'GCash'
-              ? DateTime.now().toIso8601String()
-              : null,
+      'payment_submitted_at': _selectedCertificatePaymentMethod == 'GCash'
+          ? DateTime.now().toIso8601String()
+          : null,
       'fee_label': feeLabel,
       'fee_amount': _parseCertificateFeeAmount(feeLabel),
       'purpose': _certificateControllers['purpose']!.text.trim(),
@@ -2701,10 +2702,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ? null
               : _certificateControllers['additional_notes']!.text.trim(),
       'form_data': sanitizedFormData,
-      'status':
-          _selectedCertificatePaymentMethod == 'GCash'
-              ? 'awaiting_payment'
-              : 'pending',
+      'status': _selectedCertificatePaymentMethod == 'GCash'
+          ? 'awaiting_payment'
+          : 'pending',
     };
   }
 
@@ -2729,10 +2729,10 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           "document-payment-proofs/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName";
 
       await _supabase.storage.from('resident-files').upload(
-        filePath,
-        imageFile,
-        fileOptions: const FileOptions(upsert: true),
-      );
+            filePath,
+            imageFile,
+            fileOptions: const FileOptions(upsert: true),
+          );
 
       return _supabase.storage.from('resident-files').getPublicUrl(filePath);
     } catch (_) {
@@ -2879,128 +2879,34 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   void _onDestinationSelected(int index) {
+    if (_currentTab == index) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _currentTab = index);
+  }
+
+  void _goBackWithinDashboard() {
+    FocusScope.of(context).unfocus();
     setState(() {
-      _currentTab = index;
-      _selectedCertificateRequest = null;
-      if (index == 1) {
-        _serviceView = _ResidentServiceView.menu;
+      if (_currentTab == 1 && _serviceView != _ResidentServiceView.menu) {
+        _serviceView =
+            _serviceView == _ResidentServiceView.certificateRequestForm
+                ? _ResidentServiceView.certificates
+                : _ResidentServiceView.menu;
+      } else {
+        _currentTab = 0;
       }
     });
   }
 
   Future<void> _showCategorySheet() async {
-    await showModalBottomSheet<void>(
+    final category = await showAppSelectionSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-        return SafeArea(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: screenHeight * 0.82,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(18, 18, 18, 24 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD8DEE8),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    "Choose an issue category",
-                    style: TextStyle(
-                      color: Color(0xFF103B69),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _categories.map((category) {
-                          final selected = category == _selectedCategory;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  setState(() => _selectedCategory = category);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: selected
-                                        ? const Color(0xFFF4F8FD)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: selected
-                                          ? _brandBlue
-                                          : const Color(0xFFE4E9F1),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          category,
-                                          style: TextStyle(
-                                            color: selected
-                                                ? _brandBlue
-                                                : const Color(0xFF2B3B4D),
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                        ),
-                                      ),
-                                      if (selected)
-                                        const Icon(
-                                          Icons.check_rounded,
-                                          color: _brandBlue,
-                                          size: 20,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      title: 'Choose an issue category',
+      options: _categories,
+      selectedValue: _selectedCategory,
     );
+    if (!mounted || category == null) return;
+    setState(() => _selectedCategory = category);
   }
 
   Widget _buildTopActionButton({
@@ -3019,7 +2925,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           type: MaterialType.transparency,
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: () => _runAfterTapFeedback(onTap),
+            onTap: () => _runAction(onTap),
             child: Center(
               child: SvgPicture.asset(
                 'lib/assets/bell.svg',
@@ -3106,6 +3012,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ));
     }
 
+    if (_announcementsLoadFailed) {
+      return AppStatusMessage(
+          message: 'Announcements could not be refreshed.',
+          icon: Icons.cloud_off_rounded,
+          onRetry: _fetchAnnouncements);
+    }
     if (_announcements.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -3131,7 +3043,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
-        physics: const BouncingScrollPhysics(),
         itemCount: previewItems.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
@@ -3157,7 +3068,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       color: const Color(0xFFE2E8F0),
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(
+        onTap: () => _runAction(
           () => _showAnnouncementDetails(item),
         ),
         borderRadius: BorderRadius.circular(10),
@@ -3262,7 +3173,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       color: bg,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(onTap),
+        onTap: () => _runAction(onTap),
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -3322,7 +3233,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: onTap == null ? null : () => _runAfterTapFeedback(onTap),
+      onTap: onTap == null ? null : () => _runAction(onTap),
       borderRadius: BorderRadius.circular(16),
       child: Ink(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -3534,6 +3445,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         ]);
       },
       child: ListView(
+        key: const PageStorageKey('home'),
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
         children: [
           _buildHomeHeader(),
@@ -3601,44 +3514,55 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: ongoingReports.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Text(
-                            "No ongoing services right now.",
-                            style: TextStyle(color: Color(0xFF64748B)),
-                          ),
-                        )
-                      : Column(
-                          children:
-                              List.generate(ongoingReports.length, (index) {
-                            final report = ongoingReports[index];
-                            final category = (report['category']
-                                        ?.toString()
-                                        .trim()
-                                        .isNotEmpty ??
-                                    false)
-                                ? report['category'].toString()
-                                : "Community concern";
-                            final subtitle =
-                                "Status change to ${_statusLabel(report['status']?.toString() ?? 'pending').toLowerCase()}";
-                            return Column(
-                              children: [
-                                _buildServiceStatusCard(
-                                  icon: Icons.campaign_outlined,
-                                  iconColor: Color(0xFF17365D),
-                                  iconBg: Color(0xFFF1F3F5),
-                                  title: category,
-                                  subtitle: subtitle,
-                                  onTap: () => _showReportDetails(report),
+                  child: _reportsLoadFailed
+                      ? AppStatusMessage(
+                          message: 'Activity could not be refreshed.',
+                          icon: Icons.cloud_off_rounded,
+                          onRetry: _fetchResidentActivity)
+                      : _isLoadingReports && _reports.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(child: CircularProgressIndicator()))
+                          : ongoingReports.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Text(
+                                    "No ongoing services right now.",
+                                    style: TextStyle(color: Color(0xFF64748B)),
+                                  ),
+                                )
+                              : Column(
+                                  children: List.generate(ongoingReports.length,
+                                      (index) {
+                                    final report = ongoingReports[index];
+                                    final category = (report['category']
+                                                ?.toString()
+                                                .trim()
+                                                .isNotEmpty ??
+                                            false)
+                                        ? report['category'].toString()
+                                        : "Community concern";
+                                    final subtitle =
+                                        "Status change to ${_statusLabel(report['status']?.toString() ?? 'pending').toLowerCase()}";
+                                    return Column(
+                                      children: [
+                                        _buildServiceStatusCard(
+                                          icon: Icons.campaign_outlined,
+                                          iconColor: Color(0xFF17365D),
+                                          iconBg: Color(0xFFF1F3F5),
+                                          title: category,
+                                          subtitle: subtitle,
+                                          onTap: () =>
+                                              _showReportDetails(report),
+                                        ),
+                                        if (index != ongoingReports.length - 1)
+                                          const Divider(
+                                              height: 18,
+                                              color: Color(0xFFE8EDF3)),
+                                      ],
+                                    );
+                                  }),
                                 ),
-                                if (index != ongoingReports.length - 1)
-                                  const Divider(
-                                      height: 18, color: Color(0xFFE8EDF3)),
-                              ],
-                            );
-                          }),
-                        ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
@@ -3658,46 +3582,57 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: recentReports.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Text(
-                            "No recent activity yet.",
-                            style: TextStyle(color: Color(0xFF64748B)),
-                          ),
-                        )
-                      : Column(
-                          children:
-                              List.generate(recentReports.length, (index) {
-                            final report = recentReports[index];
-                            final category = (report['category']
-                                        ?.toString()
-                                        .trim()
-                                        .isNotEmpty ??
-                                    false)
-                                ? report['category'].toString()
-                                : "Incident Report";
-                            return Column(
-                              children: [
-                                _buildServiceStatusCard(
-                                  icon: Icons.description_outlined,
-                                  iconColor: const Color(0xFF64748B),
-                                  iconBg: const Color(0xFFF3F5F7),
-                                  title: category,
-                                  subtitle:
-                                      "Assigned status: ${_statusLabel(report['status']?.toString() ?? 'pending')}",
-                                  trailing: _relativeActivityLabel(
-                                    report['created_at']?.toString(),
+                  child: _reportsLoadFailed
+                      ? AppStatusMessage(
+                          message: 'Activity could not be refreshed.',
+                          icon: Icons.cloud_off_rounded,
+                          onRetry: _fetchResidentActivity)
+                      : _isLoadingReports && _reports.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(child: CircularProgressIndicator()))
+                          : recentReports.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                  child: Text(
+                                    "No recent activity yet.",
+                                    style: TextStyle(color: Color(0xFF64748B)),
                                   ),
-                                  onTap: () => _showReportDetails(report),
+                                )
+                              : Column(
+                                  children: List.generate(recentReports.length,
+                                      (index) {
+                                    final report = recentReports[index];
+                                    final category = (report['category']
+                                                ?.toString()
+                                                .trim()
+                                                .isNotEmpty ??
+                                            false)
+                                        ? report['category'].toString()
+                                        : "Incident Report";
+                                    return Column(
+                                      children: [
+                                        _buildServiceStatusCard(
+                                          icon: Icons.description_outlined,
+                                          iconColor: const Color(0xFF64748B),
+                                          iconBg: const Color(0xFFF3F5F7),
+                                          title: category,
+                                          subtitle:
+                                              "Assigned status: ${_statusLabel(report['status']?.toString() ?? 'pending')}",
+                                          trailing: _relativeActivityLabel(
+                                            report['created_at']?.toString(),
+                                          ),
+                                          onTap: () =>
+                                              _showReportDetails(report),
+                                        ),
+                                        if (index != recentReports.length - 1)
+                                          const Divider(
+                                              height: 18,
+                                              color: Color(0xFFE8EDF3)),
+                                      ],
+                                    );
+                                  }),
                                 ),
-                                if (index != recentReports.length - 1)
-                                  const Divider(
-                                      height: 18, color: Color(0xFFE8EDF3)),
-                              ],
-                            );
-                          }),
-                        ),
                 ),
               ],
             ),
@@ -3725,6 +3660,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     bool allowBackToMenu = false,
     VoidCallback? onBack,
   }) {
+    final compact = MediaQuery.viewInsetsOf(context).bottom > 0 ||
+        MediaQuery.sizeOf(context).height < 650 ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.3;
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -3739,7 +3677,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           children: [
             Row(
               children: [
-                GestureDetector(
+                AppTapSurface(
+                  label: allowBackToMenu ? 'Back to services' : null,
                   onTap: allowBackToMenu
                       ? (onBack ??
                           () {
@@ -3764,25 +3703,27 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: compact ? 8 : 30),
             Text(
               title,
-              style: const TextStyle(
-                color: Color(0xFF004687),
-                fontSize: 40,
+              style: TextStyle(
+                color: const Color(0xFF004687),
+                fontSize: compact ? 22 : 40,
                 fontWeight: FontWeight.w800,
                 height: 1.12,
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: Color(0xFF424751),
-                fontSize: 18,
-                height: 1.4,
+            if (!compact) ...[
+              const SizedBox(height: 16),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF424751),
+                  fontSize: 18,
+                  height: 1.4,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -3803,7 +3744,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       color: background,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(onTap),
+        onTap: () => _runAction(onTap),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.fromLTRB(30, 32, 28, 32),
@@ -3883,7 +3824,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(onTap),
+        onTap: () => _runAction(onTap),
         borderRadius: BorderRadius.circular(14),
         child: InputDecorator(
           decoration: InputDecoration(
@@ -4071,9 +4012,10 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               "Access essential barangay services, request official documentation, or report local concerns directly to your community leaders.",
         ),
         Expanded(
-          child: StretchingOverscrollIndicator(
-            axisDirection: AxisDirection.down,
+          child: ScrollConfiguration(
+            behavior: const AppScrollBehavior(),
             child: ListView(
+              key: const PageStorageKey('services'),
               clipBehavior: Clip.none,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
@@ -4133,6 +4075,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         ),
         Expanded(
           child: ListView(
+            key: const PageStorageKey('report-form'),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
             children: [
               _buildReportSectionTitle("Issue Category"),
@@ -4254,7 +4197,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                           Positioned(
                             right: 4,
                             top: 4,
-                            child: GestureDetector(
+                            child: AppTapSurface(
                               onTap: () => _removeSelectedReportImage(index),
                               child: Container(
                                 decoration: const BoxDecoration(
@@ -4653,7 +4596,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildDocumentPaymentProofCard(String imageUrl) {
-    return GestureDetector(
+    return AppTapSurface(
       onTap: () => _showSwipeImageGallery([imageUrl], initialIndex: 0),
       child: Container(
         width: double.infinity,
@@ -4710,13 +4653,10 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   String _humanizeRequestFieldLabel(String key) {
-    return key
-        .split('_')
-        .map((part) {
-          if (part.isEmpty) return part;
-          return part[0].toUpperCase() + part.substring(1);
-        })
-        .join(' ');
+    return key.split('_').map((part) {
+      if (part.isEmpty) return part;
+      return part[0].toUpperCase() + part.substring(1);
+    }).join(' ');
   }
 
   Widget _buildRequestCard(Map<String, dynamic> report) {
@@ -4726,10 +4666,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     final statusChipStyle = _statusChipStyle(status);
     final normalizedStatus = status.toLowerCase();
     final category = (report['category'] as String?)?.trim();
-    final certificateTitle = (report['certificate_title'] as String?)
-        ?.trim();
-    final certificateVariant = (report['certificate_variant'] as String?)
-        ?.trim();
+    final certificateTitle = (report['certificate_title'] as String?)?.trim();
+    final certificateVariant =
+        (report['certificate_variant'] as String?)?.trim();
     final title = isDocumentRequest
         ? ((certificateTitle != null && certificateTitle.isNotEmpty)
             ? (certificateVariant != null && certificateVariant.isNotEmpty
@@ -4757,7 +4696,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _runAfterTapFeedback(
+        onTap: () => _runAction(
           () => isDocumentRequest
               ? _showDocumentRequestDetails(report)
               : _showReportDetails(report),
@@ -4828,7 +4767,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ),
                     const SizedBox(height: 8),
                     InkWell(
-                      onTap: () => _runAfterTapFeedback(
+                      onTap: () => _runAction(
                         () => _showReportDetails(report),
                       ),
                       borderRadius: BorderRadius.circular(999),
@@ -4867,6 +4806,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
   Widget _buildCertificatesTab() {
     return ListView(
+      key: const PageStorageKey('certificates'),
       padding: EdgeInsets.zero,
       children: [
         _buildServicesTopBar(
@@ -4901,7 +4841,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          onTap: () => _runAfterTapFeedback(
+          onTap: () => _runAction(
             () => _openCertificateRequestForm(item),
           ),
           borderRadius: BorderRadius.circular(14),
@@ -5009,6 +4949,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         ),
         Expanded(
           child: ListView(
+            key: const PageStorageKey('certificate-form'),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               Container(
@@ -5404,14 +5345,16 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       runSpacing: 10,
       children: options.map((option) {
         final isSelected = _selectedCertificatePaymentMethod == option;
-        return GestureDetector(
+        return AppTapSurface(
+          selected: isSelected,
+          borderRadius: BorderRadius.circular(999),
           onTap: () {
             setState(() {
               _selectedCertificatePaymentMethod = option;
             });
           },
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: appMotionDuration(context, 160),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected ? _brandBlue : Colors.white,
@@ -5501,7 +5444,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        GestureDetector(
+        AppTapSurface(
           onTap: _pickPaymentProofImage,
           child: Container(
             width: double.infinity,
@@ -5578,22 +5521,23 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             runSpacing: 10,
             children: variants.map((variant) {
               final isSelected = _selectedCertificateVariant == variant;
-              return GestureDetector(
+              return AppTapSurface(
+                selected: isSelected,
+                borderRadius: BorderRadius.circular(999),
                 onTap: () {
                   setState(() {
                     _selectedCertificateVariant = variant;
                   });
                 },
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
+                  duration: appMotionDuration(context, 160),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: isSelected ? _brandBlue : Colors.white,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color:
-                          isSelected ? _brandBlue : const Color(0xFFE2E8F0),
+                      color: isSelected ? _brandBlue : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Text(
@@ -5639,6 +5583,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           );
     }
 
+    final rows = <Object>[
+      for (final group in groupedReports.entries) ...[
+        group.key,
+        ...group.value
+      ],
+    ];
+
     return Column(
       children: [
         _buildServicesTopBar(
@@ -5655,40 +5606,48 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               _pageHorizontalPadding,
               12,
             ),
-            child: _isLoadingReports
+            child: _isLoadingReports && activities.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : activities.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "No activity yet.",
-                          style: TextStyle(color: Color(0xFF667077)),
-                        ),
-                      )
-                    : ListView(
-                        children: groupedReports.entries.map((entry) {
+                : RefreshIndicator(
+                    onRefresh: _fetchResidentActivity,
+                    child: ListView.builder(
+                      key: const PageStorageKey('activity'),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: rows.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          if (_reportsLoadFailed || _documentsLoadFailed) {
+                            return AppStatusMessage(
+                              message:
+                                  'Some activity could not be refreshed. Please try again.',
+                              icon: Icons.cloud_off_rounded,
+                              onRetry: _isLoadingReports
+                                  ? null
+                                  : _fetchResidentActivity,
+                            );
+                          }
+                          return activities.isEmpty
+                              ? const AppStatusMessage(
+                                  message:
+                                      'No activity yet. Your reports and document requests will appear here.')
+                              : const SizedBox.shrink();
+                        }
+                        final row = rows[index - 1];
+                        if (row is String) {
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(4, 0, 4, 10),
-                                  child: Text(
-                                    entry.key,
-                                    style: const TextStyle(
-                                      color: Color(0xFF424751),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                ...entry.value.map(_buildRequestCard),
-                              ],
-                            ),
+                            padding: EdgeInsets.fromLTRB(
+                                4, index == 1 ? 0 : 10, 4, 10),
+                            child: Text(row,
+                                style: const TextStyle(
+                                    color: Color(0xFF424751),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600)),
                           );
-                        }).toList(),
-                      ),
+                        }
+                        return _buildRequestCard(row as Map<String, dynamic>);
+                      },
+                    ),
+                  ),
           ),
         ),
       ],
@@ -5703,7 +5662,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _runAfterTapFeedback(onTap),
+        onTap: () => _runAction(onTap),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
@@ -5883,6 +5842,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      useSafeArea: true,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : const AnimationStyle(
+              duration: Duration(milliseconds: 240),
+              reverseDuration: Duration(milliseconds: 180)),
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) {
@@ -6050,6 +6015,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Future<void> _showNotificationPreferencesSheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      useSafeArea: true,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : const AnimationStyle(
+              duration: Duration(milliseconds: 240),
+              reverseDuration: Duration(milliseconds: 180)),
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -6135,6 +6106,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return SafeArea(
       bottom: false,
       child: ListView(
+        key: const PageStorageKey('profile'),
         padding: const EdgeInsets.fromLTRB(
           _pageHorizontalPadding,
           _topBarTopPadding,
@@ -6327,7 +6299,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _pageBackground,
-      body: _buildBodyByTab(),
+      body: PopScope(
+        canPop: _currentTab == 0,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _goBackWithinDashboard();
+        },
+        child: AppContentSwitcher(
+            child: KeyedSubtree(
+          key: ValueKey(
+              Object.hash(_currentTab, _currentTab == 1 ? _serviceView : null)),
+          child: _buildBodyByTab(),
+        )),
+      ),
       bottomNavigationBar: NavigationBar(
         height: 72,
         selectedIndex: _currentTab,

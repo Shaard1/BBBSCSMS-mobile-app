@@ -3,96 +3,68 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_interactions.dart';
+import '../../widgets/app_launch_view.dart';
+import '../auth/login_screen.dart';
+import '../home_screen.dart';
+
 class AppIntroScreen extends StatefulWidget {
-  const AppIntroScreen({super.key});
+  const AppIntroScreen({super.key, this.initialize});
+
+  final Future<void> Function()? initialize;
 
   @override
   State<AppIntroScreen> createState() => _AppIntroScreenState();
 }
 
 class _AppIntroScreenState extends State<AppIntroScreen> {
-  static const Color _brandBlue = Color(0xFF0F84D7);
-  static const Color _pageBackground = Color(0xFFF8FAFC);
+  bool _hasError = false;
+  Timer? _presentationTimer;
 
-  Timer? _routeTimer;
+  @override
+  void dispose() {
+    _presentationTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    // Start presentation timing once the branded frame is visible.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
 
-    _routeTimer = Timer(const Duration(milliseconds: 1500), () {
+  Future<void> _start() async {
+    if (!mounted) return;
+    setState(() => _hasError = false);
+    try {
+      final presentation = Completer<void>();
+      _presentationTimer =
+          Timer(const Duration(seconds: 2), presentation.complete);
+      await Future.wait<void>([
+        if (widget.initialize != null) widget.initialize!(),
+        presentation.future,
+      ]);
       if (!mounted) return;
       final hasSession = Supabase.instance.client.auth.currentUser != null;
-      Navigator.pushReplacementNamed(context, hasSession ? '/home' : '/login');
-    });
+      Navigator.of(context).pushReplacement(PageRouteBuilder<void>(
+        settings: RouteSettings(name: hasSession ? '/home' : '/login'),
+        transitionDuration: appMotionDuration(context, 280),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            hasSession ? const HomeScreen() : const LoginScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ));
+    } catch (_) {
+      if (mounted) setState(() => _hasError = true);
+    }
   }
 
   @override
-  void dispose() {
-    _routeTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: _pageBackground,
-      body: SafeArea(
-        child: Center(
-          child: _StartupLoadingDots(),
-        ),
-      ),
-    );
-  }
-}
-
-class _StartupLoadingDots extends StatefulWidget {
-  const _StartupLoadingDots();
-
-  @override
-  State<_StartupLoadingDots> createState() => _StartupLoadingDotsState();
-}
-
-class _StartupLoadingDotsState extends State<_StartupLoadingDots> {
-  Timer? _timer;
-  int _activeDot = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 420), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _activeDot = (_activeDot + 1) % 3;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final isActive = index == _activeDot;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: EdgeInsets.only(right: index == 2 ? 0 : 10),
-          width: isActive ? 12 : 11,
-          height: isActive ? 12 : 11,
-          decoration: BoxDecoration(
-            color: isActive
-                ? _AppIntroScreenState._brandBlue.withValues(alpha: 0.9)
-                : const Color(0xFFD9EBFF),
-            shape: BoxShape.circle,
-          ),
-        );
-      }),
-    );
-  }
+  Widget build(BuildContext context) => AppLaunchView(
+        errorMessage: _hasError
+            ? 'We couldn’t start the app. Please check your connection and try again.'
+            : null,
+        onRetry: _hasError ? _start : null,
+      );
 }
