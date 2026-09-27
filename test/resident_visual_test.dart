@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:capstone_app/screens/residents/resident_dashboard_screen.dart';
+import 'package:capstone_app/screens/residents/announcement_detail_screen.dart';
+import 'package:capstone_app/widgets/app_tap_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +15,7 @@ import 'app_interactions_test.dart' show testApp, captureUi, loadAppTestFonts;
 
 // All content and credentials in this file are local test fixtures.
 const _posterUrl = 'https://example.test/community-poster.png';
+const _secondPosterUrl = 'https://example.test/community-poster-2.png';
 const _announcementTitle = 'Free theoretical driving course';
 
 class _TestAuthStorage extends GotrueAsyncStorage {
@@ -59,6 +62,10 @@ Future<void> _cacheTestPoster() async {
       const NetworkImage(_posterUrl),
       () =>
           OneFrameImageStreamCompleter(Future.value(ImageInfo(image: image))));
+  PaintingBinding.instance.imageCache.putIfAbsent(
+      const NetworkImage(_secondPosterUrl),
+      () => OneFrameImageStreamCompleter(
+          Future.value(ImageInfo(image: image.clone()))));
 }
 
 void main() {
@@ -94,8 +101,14 @@ void main() {
                 {
                   'id': 'announcement-$i',
                   'title': _announcementTitle,
-                  'content': 'Registration is now open at the barangay hall.',
+                  'content': 'Registration is now open at the barangay hall.\n\n'
+                      'Please bring a valid ID and visit the barangay office for the updated schedule. '
+                      'Our team will assist you with the requirements.\n\n'
+                      'Thank you for your patience and continued support for our community programs.',
                   'thumbnail_url': _posterUrl,
+                  'image_urls': [_posterUrl, _secondPosterUrl],
+                  'created_by_name':
+                      'Barangay Bancao-Bancao Information Office',
                   'created_at': '2026-09-20T08:00:00Z',
                 }
             ];
@@ -177,6 +190,34 @@ void main() {
       expect(find.text(_announcementTitle).first, findsOneWidget);
       expect(tester.takeException(), isNull);
       await captureUi(tester, 'home-populated-$scale');
+
+      final announcementCard = find.ancestor(
+          of: find.text(_announcementTitle).first,
+          matching: find.byType(AppTapSurface));
+      await tester.ensureVisible(announcementCard);
+      await tester.tap(find.descendant(
+          of: announcementCard, matching: find.byType(InkWell)));
+      await tester.pumpAndSettle();
+      expect(find.byType(AnnouncementDetailScreen), findsOneWidget);
+      expect(find.text('Photo 1 of 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await captureUi(tester, 'announcement-detail-$scale');
+      await tester.drag(find.byType(PageView), const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Photo 2 of 2'), findsOneWidget);
+      await tester.tap(find.text('Zoom'));
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsWidgets);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.drag(
+          find.byKey(const PageStorageKey('announcement-details')),
+          const Offset(0, -440));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await captureUi(tester, 'announcement-reading-$scale');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Services').last);
       await tester.pumpAndSettle();

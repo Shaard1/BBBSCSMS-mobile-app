@@ -180,9 +180,109 @@ void main() {
     await tester.tap(find.text('Services').last);
     await tester.pumpAndSettle();
     expect(find.text('Streetlight near the corner'), findsOneWidget);
+    await tester.tap(find.text('Activity').last);
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.tap(find.text('Services').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Streetlight near the corner'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('File a Report'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final scale in [1.0, 1.6]) {
+    testWidgets(
+        'report form validates and keeps draft after photo picker cancellation at $scale',
+        (tester) async {
+      tester.view.physicalSize = Size(scale == 1 ? 390 : 320, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(testApp(
+          const ResidentDashboardScreen(name: 'Resident', initialTabIndex: 1),
+          textScale: scale));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('File a Report'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FlutterMap), findsNothing);
+      await captureUi(tester, 'new-report-$scale');
+
+      await tester.ensureVisible(find.text('Submit Report'));
+      await tester.pumpAndSettle();
+      await captureUi(tester, 'new-report-location-$scale');
+      await tester.tap(find.text('Submit Report'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose an issue category.'), findsOneWidget);
+      expect(
+          find.text('Describe the issue you are reporting.'), findsOneWidget);
+      expect(tester.getTopLeft(find.text('Issue category')).dy, lessThan(600));
+      await tester.tap(find.text('Choose a category'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Road Damage'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byType(TextField).first);
+      await tester.enterText(
+          find.byType(TextField).first, 'Road damage near the covered court.');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.text('Choose an issue category.'), findsNothing);
+      expect(find.text('Describe the issue you are reporting.'), findsNothing);
+
+      final addPhotos = find.widgetWithText(OutlinedButton, 'Add photos');
+      await tester.ensureVisible(addPhotos);
+      await tester.tap(addPhotos);
+      await tester.pumpAndSettle();
+      expect(find.text('Take a photo'), findsOneWidget);
+      expect(find.text('Choose from gallery'), findsOneWidget);
+      await captureUi(tester, 'report-photo-options-$scale');
+      await tester.tap(find.byTooltip('Close photo options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Road damage near the covered court.'), findsOneWidget);
+      await tester.ensureVisible(find.text('Submit Report'));
+      await tester.tap(find.text('Submit Report'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add at least one photo of the issue.'), findsOneWidget);
+      expect(tester.getCenter(addPhotos).dy, lessThan(720));
+      await tester.ensureVisible(find.text('Choose on map'));
+      await tester.tap(find.text('Choose on map'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MarkerLayer), findsNothing);
+      await tester.tap(find.byType(FlutterMap));
+      // The map waits briefly to distinguish a tap from double-tap zoom.
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      expect(find.byType(MarkerLayer), findsOneWidget);
+      await tester.tap(find.text('Confirm Location'));
+      await tester.pumpAndSettle();
+      expect(find.text('Location selected'), findsOneWidget);
+      expect(find.text('Choose the location of the issue before submitting.'),
+          findsNothing);
+      final firstCenter = tester
+          .widget<FlutterMap>(find.byType(FlutterMap))
+          .options
+          .initialCenter;
+      await tester.ensureVisible(find.text('Change pin on map'));
+      await tester.tap(find.text('Change pin on map'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(
+          tester.getCenter(find.byType(FlutterMap)) + const Offset(30, 20));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm Location'));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<FlutterMap>(find.byType(FlutterMap))
+              .options
+              .initialCenter,
+          isNot(firstCenter));
+      await tester.ensureVisible(find.text('Submit Report'));
+      await captureUi(tester, 'report-selected-location-$scale');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 }

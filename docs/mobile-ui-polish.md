@@ -43,10 +43,34 @@ structure, service flows, and navigation destinations remain the basis of the UI
 main tabs. The visual test data, poster artwork, and account are synthetic and
 never sent to the production backend.
 
+## Announcement details and new-report refinement
+
+- Announcement details use a persistent back bar, an uncropped poster with an
+  explicit zoom action, a photo counter and selectable thumbnails when there are
+  multiple photos, and a separate reading panel. Author and date stack and wrap;
+  rich-text formatting remains available. The page owns and disposes its gallery
+  controller. Image loading and unavailable-image states stay within the frame.
+- New reports group the issue, photos, and location into three numbered cards.
+  The heading scrolls with the form, leaving a compact back bar while typing.
+  Required fields show inline errors, and submission scrolls to the first
+  incomplete section. Existing report requirements and submission payloads remain.
+- Photo selection offers camera and gallery choices in a dismissible Flutter
+  bottom sheet. Selected photos have larger removal controls and a count. The
+  existing ten-photo limit is reflected in the instructions; the former
+  unenforced file-size claim is removed.
+- Unselected locations show an honest empty state instead of a default map pin.
+  Selecting a location shows the preview and coordinates. Changing the pin
+  rebuilds the map around the new coordinates. Location actions remain outside
+  the map so text can wrap without hiding map content.
+- `build/ui-review/announcement-report-redesign.png` shows the updated details
+  and report form using local sample content. Widget checks exercise gallery
+  swiping/zoom/back, cancelling photo choices, preserving report text, required
+  fields, and selecting/changing a map pin at normal and 160% text sizes.
+
 ## Validation
 
 - Dart analysis: no issues.
-- Flutter tests: 16 passing, covering startup timing/retry, selection and
+- Flutter tests: 18 passing, covering startup timing/retry, selection and
   cancellation, small-screen dropdown scrolling, reduced motion, keyboard
   dismissal, toast dismissal, large-text forms, tab scroll restoration,
   report-draft retention, system back navigation, populated resident flows at

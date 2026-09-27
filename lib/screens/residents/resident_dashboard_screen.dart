@@ -141,6 +141,10 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   bool _announcementsLoadFailed = false;
   bool _isLoadingAnnouncements = true;
   bool _isSubmittingReport = false;
+  bool _reportValidationRequested = false;
+  final _reportIssueKey = GlobalKey();
+  final _reportPhotosKey = GlobalKey();
+  final _reportLocationKey = GlobalKey();
   bool _isSubmittingCertificateRequest = false;
   bool _isFetchingLocation = false;
   bool _notifyAnnouncements = true;
@@ -557,19 +561,26 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Future<void> _submitReport() async {
-    if (_selectedCategory == null || _selectedCategory!.trim().isEmpty) {
-      _showSnackBar("Please choose an issue category.");
-      return;
-    }
-
-    if (_descriptionController.text.trim().isEmpty ||
-        _selectedReportImages.isEmpty) {
-      _showSnackBar("Please add a description and at least one photo.");
-      return;
-    }
-
-    if (_reportLatitude == null || _reportLongitude == null) {
-      _showSnackBar("Please set report location on the map.");
+    if (_isSubmittingReport) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _reportValidationRequested = true);
+    final GlobalKey? missingSection =
+        _selectedCategory == null || _descriptionController.text.trim().isEmpty
+            ? _reportIssueKey
+            : _selectedReportImages.isEmpty
+                ? _reportPhotosKey
+                : _reportLatitude == null || _reportLongitude == null
+                    ? _reportLocationKey
+                    : null;
+    if (missingSection != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final sectionContext = missingSection.currentContext;
+        if (!mounted || sectionContext == null) return;
+        Scrollable.ensureVisible(sectionContext,
+            alignment: 0.05,
+            duration: appMotionDuration(context),
+            curve: Curves.easeOut);
+      });
       return;
     }
 
@@ -618,6 +629,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
       setState(() {
         _isSubmittingReport = false;
+        _reportValidationRequested = false;
         _descriptionController.clear();
         _selectedReportImages.clear();
         _selectedCategory = null;
@@ -1918,7 +1930,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         date: _formatAnnouncementDate(announcement.createdAt),
         category: _announcementListCategory(announcement),
         content: _buildAnnouncementRichContent(announcement.content),
-        onOpenImage: (images, index) => _showSwipeImageGallery(images, initialIndex: index),
+        onOpenImage: (images, index) =>
+            _showSwipeImageGallery(images, initialIndex: index),
       ),
     ));
   }
@@ -2692,17 +2705,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         _currentTab = 0;
       }
     });
-  }
-
-  Future<void> _showCategorySheet() async {
-    final category = await showAppSelectionSheet(
-      context: context,
-      title: 'Choose an issue category',
-      options: _categories,
-      selectedValue: _selectedCategory,
-    );
-    if (!mounted || category == null) return;
-    setState(() => _selectedCategory = category);
   }
 
   Widget _buildTopActionButton({
@@ -3504,190 +3506,279 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _buildServiceSelectorField({
-    required String placeholder,
-    required String? value,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _runAction(onTap),
-        borderRadius: BorderRadius.circular(14),
-        child: InputDecorator(
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: placeholder,
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            suffixIcon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF94A3B8),
-            ),
-          ),
-          child: Text(
-            value ?? placeholder,
-            style: TextStyle(
-              color: value == null
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF334155),
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ),
-      ),
+  Widget _reportSection({
+    required GlobalKey sectionKey,
+    required String number,
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) =>
+      Container(
+        key: sectionKey,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFE1E9F2))),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: _softBlue, borderRadius: BorderRadius.circular(10)),
+                child: Text(number,
+                    style: const TextStyle(
+                        color: _brandBlue,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700))),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: Color(0xFF172B46),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: Color(0xFF64748B), fontSize: 12, height: 1.5)),
+                ])),
+          ]),
+          const SizedBox(height: 18),
+          child,
+        ]),
+      );
+
+  Widget _reportFieldLabel(String label) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(label,
+            style: const TextStyle(
+                color: Color(0xFF334155),
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
+      );
+
+  Widget _reportFieldError(String message) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Semantics(
+            liveRegion: true,
+            child: Text(message,
+                style: const TextStyle(
+                    color: Color(0xFFB42318), fontSize: 12, height: 1.4))),
+      );
+
+  Future<void> _showReportPhotoSources() async {
+    FocusScope.of(context).unfocus();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : const AnimationStyle(duration: Duration(milliseconds: 240)),
+      builder: (sheetContext) => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    const Expanded(
+                        child: Text('Add report photos',
+                            style: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.w700))),
+                    IconButton(
+                        tooltip: 'Close photo options',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded)),
+                  ]),
+                  const SizedBox(height: 8),
+                  ListTile(
+                      leading: const Icon(Icons.camera_alt_outlined,
+                          color: _brandBlue),
+                      title: const Text('Take a photo'),
+                      subtitle: const Text('Use your camera'),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, ImageSource.camera)),
+                  ListTile(
+                      leading: const Icon(Icons.photo_library_outlined,
+                          color: _brandBlue),
+                      title: const Text('Choose from gallery'),
+                      subtitle: const Text('Select one or more photos'),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, ImageSource.gallery)),
+                ]),
+          )),
     );
+    if (!mounted || source == null) return;
+    await _runAction(() => _pickReportImage(source));
   }
 
-  Widget _buildReportMapSection() {
-    final point = (_reportLatitude != null && _reportLongitude != null)
-        ? LatLng(_reportLatitude!, _reportLongitude!)
-        : const LatLng(9.7392, 118.7353);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.place_outlined, color: _brandBlue, size: 18),
-              SizedBox(width: 6),
-              Text(
-                "Pin Location",
-                style: TextStyle(
-                  color: Color(0xFF1F2937),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            "Where is this issue located?",
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
-            ),
-          ),
+  Widget _buildReportPhotos() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_selectedReportImages.isNotEmpty) ...[
+          SizedBox(
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _selectedReportImages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, index) => SizedBox(
+                    width: 112,
+                    child: Stack(children: [
+                      Positioned.fill(
+                          child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Image.file(_selectedReportImages[index],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const ColoredBox(
+                                          color: Color(0xFFEAF3FF),
+                                          child: Icon(
+                                              Icons.broken_image_outlined))))),
+                      Positioned(
+                          top: 0,
+                          right: 0,
+                          child: IconButton.filled(
+                              tooltip: 'Remove photo ${index + 1}',
+                              style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black54,
+                                  foregroundColor: Colors.white),
+                              onPressed: () =>
+                                  _removeSelectedReportImage(index),
+                              icon: const Icon(Icons.close_rounded, size: 20))),
+                    ])),
+              )),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              height: 170,
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    options: MapOptions(
-                      initialCenter: point,
-                      initialZoom: _reportLatitude == null ? 13 : 15,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.none,
-                      ),
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                        userAgentPackageName: 'com.example.barangay_mobile_app',
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            width: 42,
-                            height: 42,
-                            point: point,
-                            child: const Icon(
-                              Icons.location_on_rounded,
-                              color: Colors.red,
-                              size: 38,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: FilledButton.icon(
-                      onPressed:
-                          _isFetchingLocation ? null : _captureCurrentLocation,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _brandBlue,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          side: const BorderSide(color: Color(0xFFD5DFEC)),
-                        ),
-                      ),
-                      icon: _isFetchingLocation
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.my_location_outlined, size: 16),
-                      label: const Text(
-                        "Current Location",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           Text(
-            _reportLatitude == null
-                ? "A precise location helps our responders find the issue faster."
-                : _reportLocationLabel,
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 11,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextButton.icon(
-            onPressed: _pickLocationOnMap,
-            icon: const Icon(Icons.map_outlined, size: 16),
-            label: Text(
-              _reportLatitude == null ? "Choose on Map" : "Update Pin on Map",
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: _brandBlue,
-              padding: EdgeInsets.zero,
-            ),
-          ),
+              '${_selectedReportImages.length} of $_maxReportImages photos added',
+              style: const TextStyle(
+                  color: _brandBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
         ],
-      ),
-    );
+        if (_selectedReportImages.length < _maxReportImages)
+          OutlinedButton.icon(
+              onPressed: _showReportPhotoSources,
+              style: OutlinedButton.styleFrom(
+                  backgroundColor: _softBlue,
+                  side: const BorderSide(color: Color(0xFFCADDF4)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              icon: const Icon(Icons.add_a_photo_outlined, size: 22),
+              label: Text(_selectedReportImages.isEmpty
+                  ? 'Add photos'
+                  : 'Add more photos')),
+        if (_reportValidationRequested && _selectedReportImages.isEmpty)
+          _reportFieldError('Add at least one photo of the issue.'),
+      ]);
+
+  Widget _buildReportMapSection() {
+    final hasLocation = _reportLatitude != null && _reportLongitude != null;
+    final point =
+        hasLocation ? LatLng(_reportLatitude!, _reportLongitude!) : null;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (point != null) ...[
+        AppTapSurface(
+            label: 'Change report location on map',
+            onTap: _pickLocationOnMap,
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                    height: 170,
+                    child: FlutterMap(
+                      key: ValueKey(
+                          Object.hash(point.latitude, point.longitude)),
+                      options: MapOptions(
+                          initialCenter: point,
+                          initialZoom: 15,
+                          interactionOptions: const InteractionOptions(
+                              flags: InteractiveFlag.none)),
+                      children: [
+                        TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName:
+                                'com.example.barangay_mobile_app'),
+                        MarkerLayer(markers: [
+                          Marker(
+                              width: 42,
+                              height: 42,
+                              point: point,
+                              child: const Icon(Icons.location_on_rounded,
+                                  color: _brandBlue, size: 38))
+                        ]),
+                      ],
+                    )))),
+        const SizedBox(height: 12),
+        const Text('Location selected',
+            style: TextStyle(
+                color: Color(0xFF08745B),
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text(_reportLocationLabel,
+            style: const TextStyle(
+                color: Color(0xFF64748B), fontSize: 12, height: 1.5)),
+      ] else
+        Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+                color: const Color(0xFFF3F7FC),
+                borderRadius: BorderRadius.circular(16)),
+            child: const Column(children: [
+              Icon(Icons.add_location_alt_outlined,
+                  color: _brandBlue, size: 32),
+              SizedBox(height: 10),
+              Text('Choose the exact spot',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Color(0xFF172B46),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+              SizedBox(height: 6),
+              Text(
+                  'Place a pin where the issue is, or use your location if you are there now.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Color(0xFF64748B), fontSize: 12, height: 1.5)),
+            ])),
+      const SizedBox(height: 14),
+      OutlinedButton.icon(
+          onPressed: _isFetchingLocation ? null : _pickLocationOnMap,
+          style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFCADDF4)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14))),
+          icon: const Icon(Icons.map_outlined, size: 20),
+          label: Text(hasLocation ? 'Change pin on map' : 'Choose on map')),
+      TextButton.icon(
+          onPressed: _isFetchingLocation ? null : _captureCurrentLocation,
+          icon: _isFetchingLocation
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.my_location_rounded, size: 18),
+          label: Text(_isFetchingLocation
+              ? 'Finding your location...'
+              : 'Use my current location')),
+      if (_reportValidationRequested && !hasLocation)
+        _reportFieldError(
+            'Choose the location of the issue before submitting.'),
+    ]);
   }
 
   Widget _buildServicesMenuTab() {
@@ -3753,205 +3844,143 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildReportTab() {
-    return Column(
-      children: [
-        _buildServicesTopBar(
-          sectionLabel: "Services",
-          title: "Create a New Report",
-          subtitle: "Help us maintain the beauty and safety of our barangay.",
-          allowBackToMenu: true,
-        ),
-        Expanded(
-          child: ListView(
+    final categoryMissing =
+        _reportValidationRequested && _selectedCategory == null;
+    final descriptionMissing = _reportValidationRequested &&
+        _descriptionController.text.trim().isEmpty;
+    return Column(children: [
+      SafeArea(
+          bottom: false,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+              child: Row(children: [
+                TextButton.icon(
+                    onPressed: () => setState(
+                        () => _serviceView = _ResidentServiceView.menu),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                    label: const Text('Services')),
+                const Spacer(),
+                _buildTopActionButton(onTap: _openAnnouncementNotifications),
+              ]))),
+      Expanded(
+        child: SingleChildScrollView(
             key: const PageStorageKey('report-form'),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            children: [
-              _buildReportSectionTitle("Issue Category"),
-              const SizedBox(height: 2),
-              const Text(
-                "What type of concern are you reporting?",
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildServiceSelectorField(
-                placeholder: "Choose a category",
-                value: _selectedCategory,
-                onTap: _showCategorySheet,
-              ),
-              const SizedBox(height: 18),
-              _buildReportSectionTitle("Incident Details"),
-              const SizedBox(height: 2),
-              const Text(
-                "Describe the issue and provide details.",
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText:
-                      "Enter as much detail as possible to help our team respond quickly...",
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.all(16),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _pickReportImage(ImageSource.gallery),
-                  borderRadius: BorderRadius.circular(16),
-                  child: CustomPaint(
-                    painter: const _DashedServiceRectPainter(
-                      color: Color(0xFFB8CBE3),
-                      radius: 16,
-                    ),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.add_a_photo_outlined,
-                            color: _brandBlue,
-                            size: 22,
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            "Upload Photo",
-                            style: TextStyle(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: AbsorbPointer(
+                absorbing: _isSubmittingReport,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Create a new report',
+                          style: TextStyle(
                               color: _brandBlue,
+                              fontSize: 27,
                               fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _selectedReportImages.isEmpty
-                                ? "Maximum file size: 10MB. Formats: JPG, PNG."
-                                : "${_selectedReportImages.length} photo(s) selected",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (_selectedReportImages.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 82,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedReportImages.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final image = _selectedReportImages[index];
-                      return Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              image,
-                              width: 82,
-                              height: 82,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          Positioned(
-                            right: 4,
-                            top: 4,
-                            child: AppTapSurface(
-                              onTap: () => _removeSelectedReportImage(index),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                padding: const EdgeInsets.all(2),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              _buildReportMapSection(),
-              const SizedBox(height: 18),
-              SizedBox(
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isSubmittingReport ? null : _submitReport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _brandBlue,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isSubmittingReport
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Submit Report",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(Icons.play_arrow_rounded, size: 18),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+                              height: 1.2,
+                              letterSpacing: -0.5)),
+                      const SizedBox(height: 10),
+                      const Text(
+                          'Tell us what happened so your barangay can help.',
+                          style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 14,
+                              height: 1.5)),
+                      const SizedBox(height: 10),
+                      const Text('All three sections are required.',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 12)),
+                      const SizedBox(height: 22),
+                      _reportSection(
+                          sectionKey: _reportIssueKey,
+                          number: '1',
+                          title: 'About the issue',
+                          subtitle:
+                              'Choose a category and describe what happened.',
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _reportFieldLabel('Issue category'),
+                                AppSelectionField(
+                                    label: 'Choose a category',
+                                    options: _categories,
+                                    value: _selectedCategory,
+                                    leading: const Icon(Icons.category_outlined,
+                                        size: 20, color: _brandBlue),
+                                    errorText: categoryMissing
+                                        ? 'Choose an issue category.'
+                                        : null,
+                                    onSelected: (value) => setState(
+                                        () => _selectedCategory = value)),
+                                const SizedBox(height: 20),
+                                _reportFieldLabel('What happened?'),
+                                TextField(
+                                    controller: _descriptionController,
+                                    minLines: 4,
+                                    maxLines: 8,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    onChanged: (_) {
+                                      if (_reportValidationRequested) {
+                                        setState(() {});
+                                      }
+                                    },
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF334155),
+                                        height: 1.5),
+                                    decoration: InputDecoration(
+                                        hintText:
+                                            'Describe the issue, when it started, and a nearby landmark.',
+                                        fillColor: const Color(0xFFF8FAFC),
+                                        errorText: descriptionMissing
+                                            ? 'Describe the issue you are reporting.'
+                                            : null)),
+                              ])),
+                      const SizedBox(height: 16),
+                      _reportSection(
+                          sectionKey: _reportPhotosKey,
+                          number: '2',
+                          title: 'Add photos',
+                          subtitle:
+                              'Add at least one clear photo. You can attach up to $_maxReportImages.',
+                          child: _buildReportPhotos()),
+                      const SizedBox(height: 16),
+                      _reportSection(
+                          sectionKey: _reportLocationKey,
+                          number: '3',
+                          title: 'Issue location',
+                          subtitle: 'Help the barangay find the right place.',
+                          child: _buildReportMapSection()),
+                      const SizedBox(height: 20),
+                      const Text(
+                          'Check your details, photos, and location before submitting.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12,
+                              height: 1.5)),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                          onPressed: _isSubmittingReport ? null : _submitReport,
+                          style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 17)),
+                          icon: _isSubmittingReport
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.send_rounded, size: 18),
+                          label: Text(
+                              _isSubmittingReport
+                                  ? 'Submitting report...'
+                                  : 'Submit Report',
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600))),
+                    ]))),
+      ),
+    ]);
   }
 
   Widget _buildDocumentRequestDetailsPage(Map<String, dynamic> request) {
@@ -6290,48 +6319,5 @@ class _BottomNavSvgIcon extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _DashedServiceRectPainter extends CustomPainter {
-  const _DashedServiceRectPainter({
-    required this.color,
-    required this.radius,
-  });
-
-  final Color color;
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    );
-    final path = Path()..addRRect(rect);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-
-    for (final metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        final next = distance + dashWidth;
-        canvas.drawPath(
-          metric.extractPath(distance, next.clamp(0, metric.length)),
-          paint,
-        );
-        distance += dashWidth + dashSpace;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedServiceRectPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
