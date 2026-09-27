@@ -961,9 +961,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                   textAlign: TextAlign.left,
                   style: GoogleFonts.publicSans(
                     color: _titleColor,
-                    fontSize: 36,
+                    fontSize: 28,
                     fontWeight: FontWeight.w900,
-                    height: 40 / 36,
+                    height: 1.2,
                     letterSpacing: -0.9,
                   ),
                 ),
@@ -974,7 +974,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 child: SizedBox(
                   width: 300,
                   child: Text(
-                    'Please provide your details for residency verification. This process ensures the security of our community portal.',
+                    'Tell us about yourself so the barangay can verify your residency.',
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       color: Color(0xFF424751),

@@ -28,17 +28,46 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-        minimumSize: const Size(48, 48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        minimumSize: const Size(48, 52),
+        elevation: 0,
+        backgroundColor: _brandBlue,
+        foregroundColor: Colors.white,
+        textStyle: const TextStyle(
+            fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      )),
+      filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       )),
       outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(minimumSize: const Size(48, 48))),
-      inputDecorationTheme: const InputDecorationTheme(
-        hintStyle: TextStyle(color: Color(0xFF667085)),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        hintStyle: const TextStyle(color: Color(0xFF667085), fontSize: 14),
+        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFDCE4EE))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFDCE4EE))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _brandBlue, width: 1.5)),
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFD9534F))),
         errorMaxLines: 3,
       ),
+      dividerTheme:
+          const DividerThemeData(color: Color(0xFFE9EEF5), thickness: 1),
       popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -61,20 +90,26 @@ class AppTheme {
         foregroundColor: _brandBlue,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        titleTextStyle: TextStyle(
+            fontFamily: 'Inter',
+            color: _brandBlue,
+            fontSize: 20,
+            fontWeight: FontWeight.w700),
       ),
       canvasColor: _pageBackground,
       cardTheme: CardThemeData(
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE3EAF2)),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(24),
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(

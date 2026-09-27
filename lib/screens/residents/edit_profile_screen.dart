@@ -29,7 +29,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   static const Color _brandBlue = Color(0xFF0B4F94);
-  static const Color _pageBackground = Color(0xFFF4F6F7);
+  static const Color _pageBackground = Color(0xFFF8FAFC);
 
   final SupabaseClient _supabase = Supabase.instance.client;
   final ImagePicker _picker = ImagePicker();
@@ -302,7 +302,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         foregroundColor: _brandBlue,
         titleTextStyle: const TextStyle(
           color: _brandBlue,
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -347,8 +347,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         borderRadius: BorderRadius.circular(80),
                         onTap: _pickProfileImage,
                         child: Container(
-                          width: 122,
-                          height: 122,
+                          width: 96,
+                          height: 96,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
@@ -373,8 +373,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           child: (_newProfileImage == null && !hasNetworkImage)
                               ? const Icon(
                                   Icons.person,
-                                  size: 58,
-                                  color: Color(0xFFD0D6DC),
+                                  size: 44,
+                                  color: Color(0xFF7899BB),
                                 )
                               : null,
                         ),

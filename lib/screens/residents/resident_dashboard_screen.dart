@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:path/path.dart' as path;
@@ -19,6 +18,7 @@ import '../../widgets/app_tap_surface.dart';
 import '../../widgets/app_status_message.dart';
 import '../../widgets/app_content_switcher.dart';
 import '../../core/app_interactions.dart';
+import 'announcement_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_security_screen.dart';
 import 'report_location_picker_screen.dart';
@@ -68,8 +68,6 @@ enum _ResidentServiceView {
 class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   static const String _verifiedShieldAsset =
       'lib/assets/Verified Resident badge.svg';
-  static const String _verifiedCheckAsset =
-      'lib/assets/Verified check badge.svg';
   static const String _demoGcashReceiverName = 'Demo GCash Receiver';
   static const String _demoGcashReceiverNumber = '09XXXXXXXXX';
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -122,7 +120,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   static const double _pageHorizontalPadding = 16;
   static const double _topBarTopPadding = 18;
   static const double _topActionSize = 48;
-  static const double _bottomNavIconSize = 31;
+  static const double _bottomNavIconSize = 26;
 
   final List<String> _categories = const [
     "Road Damage",
@@ -801,7 +799,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         text: const Color(0xFFB91C1C),
       );
     }
-    if (normalizedStatus == "in_process" ||
+    if (normalizedStatus == "in_progress" ||
+        normalizedStatus == "ongoing" ||
+        normalizedStatus == "in_process" ||
         normalizedStatus == "in progress" ||
         normalizedStatus == "processing" ||
         normalizedStatus == "ready_for_release") {
@@ -818,7 +818,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     }
     return (
       bg: const Color(0xFFFEF3C7),
-      text: const Color(0xFFD79321),
+      text: const Color(0xFF8A5900),
     );
   }
 
@@ -1046,8 +1046,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
+                    minWidth: 48,
+                    minHeight: 48,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1074,7 +1074,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: images.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
                   itemBuilder: (context, index) {
                     return AppTapSurface(
                       onTap: () => _showSwipeImageGallery(
@@ -1096,20 +1096,20 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 _buildReportDetailsMetaChip(
                   icon: Icons.construction_rounded,
                   label: category,
                 ),
-                const SizedBox(width: 14),
                 _buildReportDetailsMetaChip(
                   icon: Icons.calendar_today_outlined,
                   label: _formatReportDateOnly(createdAt),
                   filled: false,
                 ),
-                if (!isDocumentRequest && latitude != null && longitude != null)
-                  const Spacer(),
                 if (!isDocumentRequest && latitude != null && longitude != null)
                   InkWell(
                     onTap: () => _showReportLocationDialog(report),
@@ -1144,8 +1144,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               _reportDetailsTitle(category),
               style: const TextStyle(
                 color: Color(0xFF111827),
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
                 height: 1.1,
               ),
             ),
@@ -1173,46 +1173,51 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required List<String> imageUrls,
     required String status,
   }) {
+    if (imageUrl == null) {
+      return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE3EAF2))),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _buildReportDetailsStatusPill(status),
+            const SizedBox(height: 16),
+            const Row(children: [
+              Icon(Icons.image_outlined, color: Color(0xFF71849B), size: 22),
+              SizedBox(width: 10),
+              Expanded(
+                  child: Text('No photo attached',
+                      style:
+                          TextStyle(color: Color(0xFF64748B), fontSize: 14))),
+            ]),
+          ]));
+    }
     return AppTapSurface(
-      onTap: imageUrl == null
-          ? null
-          : () => _showSwipeImageGallery(
-                imageUrls,
-                initialIndex: 0,
-              ),
+      onTap: () => _showSwipeImageGallery(
+        imageUrls,
+        initialIndex: 0,
+      ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(46),
-          bottomLeft: Radius.circular(46),
-          bottomRight: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.circular(22),
         child: Stack(
           children: [
             SizedBox(
               width: double.infinity,
               height: 224,
-              child: imageUrl == null
-                  ? Container(
-                      color: const Color(0xFFE5E7EB),
-                      child: const Icon(
-                        Icons.image_outlined,
-                        color: Color(0xFF9CA3AF),
-                        size: 44,
-                      ),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFE5E7EB),
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: Color(0xFF9CA3AF),
-                          size: 44,
-                        ),
-                      ),
-                    ),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: const Color(0xFFE5E7EB),
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: Color(0xFF9CA3AF),
+                    size: 44,
+                  ),
+                ),
+              ),
             ),
             Positioned(
               top: 18,
@@ -1226,34 +1231,14 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildReportDetailsStatusPill(String status) {
+    final style = _statusChipStyle(status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDE7BD),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Color(0xFF111827),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            status.toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF111827),
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
+          color: style.bg, borderRadius: BorderRadius.circular(10)),
+      child: Text(status.toUpperCase(),
+          style: TextStyle(
+              color: style.text, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
 
@@ -1867,7 +1852,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       color: _parseAnnouncementColor(attributes['color']) ??
           const Color(0xFF4F545A),
       fontSize: fontSize ?? 15,
-      height: 1.5,
+      height: 1.65,
       fontWeight:
           attributes['bold'] == true ? FontWeight.w700 : FontWeight.w400,
       fontStyle:
@@ -1923,208 +1908,19 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _announcementMetaText(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFF81888F),
-        fontSize: 15,
-        fontWeight: FontWeight.w400,
-      ),
-    );
-  }
-
   Future<void> _showAnnouncementDetails(Announcement announcement) async {
     await _markAnnouncementsRead([announcement.id]);
     if (!mounted) return;
-
-    final imageUrls = <String>{
-      if (announcement.thumbnailUrl.trim().isNotEmpty)
-        announcement.thumbnailUrl.trim(),
-      ...announcement.imageUrls.where((url) => url.trim().isNotEmpty),
-    }.toList();
-
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) {
-          int selectedImageIndex = 0;
-          final pageController = PageController();
-
-          return StatefulBuilder(
-            builder: (routeContext, setRouteState) {
-              return Scaffold(
-                backgroundColor: const Color(0xFFF7F8FA),
-                body: SafeArea(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (imageUrls.isNotEmpty)
-                          AspectRatio(
-                            aspectRatio: 16 / 9,
-                            child: PageView.builder(
-                              controller: pageController,
-                              itemCount: imageUrls.length,
-                              onPageChanged: (index) {
-                                setRouteState(() {
-                                  selectedImageIndex = index;
-                                });
-                              },
-                              itemBuilder: (context, index) {
-                                return AppTapSurface(
-                                  onTap: () => _showSwipeImageGallery(
-                                    imageUrls,
-                                    initialIndex: index,
-                                  ),
-                                  child: Container(
-                                    color: const Color(0xFFE9EDF2),
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Image.network(
-                                          imageUrls[index],
-                                          width: double.infinity,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        IgnorePointer(
-                                          child: DecoratedBox(
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.bottomCenter,
-                                                end: Alignment.topCenter,
-                                                colors: [
-                                                  Color(0x66F8F9FA),
-                                                  Color(0x00F8F9FA),
-                                                ],
-                                                stops: [0.0, 1.0],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          )
-                        else
-                          Container(
-                            height: 210,
-                            width: double.infinity,
-                            color: const Color(0xFFE9EDF2),
-                            child: const Icon(
-                              Icons.campaign_outlined,
-                              color: Color(0xFF94A3B8),
-                              size: 42,
-                            ),
-                          ),
-                        if (imageUrls.length > 1)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                            child: SizedBox(
-                              height: 56,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: imageUrls.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(width: 8),
-                                itemBuilder: (context, index) {
-                                  final isSelected =
-                                      selectedImageIndex == index;
-                                  return AppTapSurface(
-                                    onTap: () {
-                                      pageController.animateToPage(
-                                        index,
-                                        duration:
-                                            const Duration(milliseconds: 220),
-                                        curve: Curves.easeOut,
-                                      );
-                                      setRouteState(() {
-                                        selectedImageIndex = index;
-                                      });
-                                    },
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 160),
-                                      padding: const EdgeInsets.all(2),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? _brandBlue
-                                              : const Color(0xFFE2E8F0),
-                                          width: isSelected ? 2 : 1,
-                                        ),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.network(
-                                          imageUrls[index],
-                                          width: 76,
-                                          height: 52,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                announcement.title.trim().isEmpty
-                                    ? "Barangay Update"
-                                    : announcement.title.trim(),
-                                style: const TextStyle(
-                                  color: Color(0xFF2C2F32),
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.16,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  _announcementMetaText(
-                                    _announcementCreatorLabel(announcement),
-                                  ),
-                                  const SizedBox(width: 32),
-                                  _announcementMetaText(
-                                    _formatAnnouncementDate(
-                                      announcement.createdAt,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              const Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: Color(0xFFE2E5E9),
-                              ),
-                              const SizedBox(height: 14),
-                              _buildAnnouncementRichContent(
-                                announcement.content,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AnnouncementDetailScreen(
+        announcement: announcement,
+        author: _announcementCreatorLabel(announcement),
+        date: _formatAnnouncementDate(announcement.createdAt),
+        category: _announcementListCategory(announcement),
+        content: _buildAnnouncementRichContent(announcement.content),
+        onOpenImage: (images, index) => _showSwipeImageGallery(images, initialIndex: index),
       ),
-    );
+    ));
   }
 
   Future<void> _openAnnouncementNotifications() async {
@@ -2365,16 +2161,16 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: () => _runAction(
           () => _showAnnouncementDetails(announcement),
         ),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x08000000),
@@ -2446,7 +2242,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                "Read more ->",
+                "Read announcement",
                 style: TextStyle(
                   color: _brandBlue,
                   fontSize: 13,
@@ -2912,38 +2708,40 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   Widget _buildTopActionButton({
     required VoidCallback onTap,
   }) {
-    return SizedBox(
-      width: _topActionSize,
-      height: _topActionSize,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFE7E7E7)),
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () => _runAction(onTap),
-            child: Center(
-              child: SvgPicture.asset(
-                'lib/assets/bell.svg',
-                width: 20,
-                height: 20,
-                colorFilter:
-                    const ColorFilter.mode(Colors.black, BlendMode.srcIn),
-                placeholderBuilder: (_) => const Icon(
-                  Icons.notifications_none_rounded,
-                  size: 20,
-                  color: Colors.black,
+    return Tooltip(
+        message: 'Notifications',
+        child: SizedBox(
+          width: _topActionSize,
+          height: _topActionSize,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE7E7E7)),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _runAction(onTap),
+                child: Center(
+                  child: SvgPicture.asset(
+                    'lib/assets/bell.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter:
+                        const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+                    placeholderBuilder: (_) => const Icon(
+                      Icons.notifications_none_rounded,
+                      size: 20,
+                      color: Colors.black,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 
   Widget _buildSectionHeader({
@@ -2951,56 +2749,31 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     String? actionText,
     VoidCallback? onAction,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF424751),
-              fontSize: 18,
-              height: 28 / 18,
-              letterSpacing: 0,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        if (actionText != null)
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(0, 0),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+    final heading = Text(title,
+        style: const TextStyle(
+            color: Color(0xFF172B46),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3));
+    final action = actionText == null
+        ? null
+        : TextButton(
             onPressed: onAction,
-            child: Transform.translate(
-              offset: const Offset(0, -1),
-              child: Container(
-                padding: EdgeInsets.zero,
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Color(0xFF003366),
-                      width: 1,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  actionText,
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(actionText,
                   style: const TextStyle(
-                    color: Color(0xFF003366),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_forward_rounded, size: 16),
+            ]));
+    if (MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [heading, if (action != null) action]);
+    }
+    return Row(
+        children: [Expanded(child: heading), if (action != null) action]);
   }
 
   Widget _buildHomeAnnouncementHighlight() {
@@ -3035,11 +2808,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     final contentWidth =
         MediaQuery.of(context).size.width - (_pageHorizontalPadding * 2);
-    final cardWidth = (contentWidth * 0.93).clamp(290.0, 340.0).toDouble();
+    final cardWidth = (contentWidth * 0.92).clamp(240.0, 360.0).toDouble();
     final previewItems = _announcements.take(5).toList();
 
     return SizedBox(
-      height: 188,
+      height: 150 + MediaQuery.textScalerOf(context).scale(76) + 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
@@ -3055,109 +2828,78 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _buildHomeAnnouncementCard(
-    Announcement item, {
-    required double width,
-  }) {
+  Widget _buildHomeAnnouncementCard(Announcement item,
+      {required double width}) {
     final imageUrl = item.thumbnailUrl.trim();
-    final preview = _plainAnnouncementPreview(item);
-    final subtitle =
-        preview.length > 56 ? "${preview.substring(0, 56)}..." : preview;
-
-    return Material(
-      color: const Color(0xFFE2E8F0),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: () => _runAction(
-          () => _showAnnouncementDetails(item),
-        ),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: width,
-          height: 188,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            image: imageUrl.isEmpty
-                ? null
-                : DecorationImage(
-                    image: NetworkImage(imageUrl),
-                    fit: BoxFit.cover,
-                  ),
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.all(Radius.circular(10)),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x00001E40),
-                  Color(0x33001E40),
-                  Color(0xE6001E40),
-                ],
-                stops: [0.0, 0.5, 1.0],
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD8BE),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _announcementBadgeLabel(item) == "COMMUNITY ALERT"
-                        ? "UPDATE"
-                        : _announcementBadgeLabel(item),
-                    style: const TextStyle(
-                      color: Color(0xFF7B3E1B),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  item.title.trim().isEmpty
-                      ? "Barangay Update"
-                      : item.title.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.publicSans(
-                    color: const Color(0xFFFFFFFF),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    height: 22.5 / 18,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: const Color(0xCCFFFFFF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    height: 16 / 14,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    final placeholder = Container(
+      color: _softBlue,
+      alignment: Alignment.center,
+      child: const Icon(Icons.campaign_outlined, size: 40, color: _brandBlue),
     );
+    return SizedBox(
+        width: width,
+        child: Material(
+          color: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: Color(0xFFE3EAF2))),
+          child: AppTapSurface(
+            label: item.title,
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _runAction(() => _showAnnouncementDetails(item)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(
+                  height: 150,
+                  width: double.infinity,
+                  child: imageUrl.isEmpty
+                      ? placeholder
+                      : Image.network(imageUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => placeholder)),
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Expanded(
+                              child: Text(_announcementBadgeLabel(item),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: _brandBlue,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.7))),
+                          const Icon(Icons.arrow_outward_rounded,
+                              size: 16, color: _brandBlue),
+                        ]),
+                        const SizedBox(height: 7),
+                        Text(
+                            item.title.trim().isEmpty
+                                ? 'Barangay Update'
+                                : item.title.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Color(0xFF172B46),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                height: 1.3)),
+                        const SizedBox(height: 5),
+                        Text(_plainAnnouncementPreview(item),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 13,
+                                height: 1.4)),
+                      ])),
+            ]),
+          ),
+        ));
   }
 
   Widget _buildQuickActionCard({
@@ -3170,55 +2912,43 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: borderColor)),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _runAction(onTap),
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            children: [
+        child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
               Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      color: bg, borderRadius: BorderRadius.circular(14)),
+                  child: Icon(icon, color: accent, size: 27)),
+              const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF1F2937),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF3F3F46),
-                        fontSize: 14,
-                        height: 1.15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(title,
+                        style: const TextStyle(
+                            color: Color(0xFF172B46),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                            height: 1.4)),
+                  ])),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 20, color: Color(0xFF71849B)),
+            ])),
       ),
     );
   }
@@ -3307,119 +3037,93 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildHomeHeader() {
-    return Container(
-      color: Colors.white,
-      child: SafeArea(
+    return SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                _pageHorizontalPadding,
-                _topBarTopPadding,
-                _pageHorizontalPadding,
-                14,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Column(children: [
+            Row(children: [
+              Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                      color: _softBlue,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: ClipOval(
-                      child: _profileImage.trim().isNotEmpty
-                          ? Image.network(
-                              _profileImage.trim(),
-                              width: 38,
-                              height: 38,
+                      border: Border.all(color: const Color(0xFFDCE8F6))),
+                  child: ClipOval(
+                      child: _profileImage.trim().isEmpty
+                          ? const Icon(Icons.person_outline_rounded,
+                              color: _brandBlue, size: 25)
+                          : Image.network(_profileImage.trim(),
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_outline,
-                                color: Color(0xFF64748B),
-                                size: 20,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person_outline,
-                              color: Color(0xFF64748B),
-                              size: 20,
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Transform.translate(
-                      offset: const Offset(0, -4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Mabuhay,",
-                            style: TextStyle(
-                              color: Color(0xFF696969),
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 0.5),
-                          Text(
-                            _fullName.isEmpty ? "Resident" : _fullName,
-                            style: const TextStyle(
-                              color: Color(0xFF1E1E1E),
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              height: 1.02,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      _buildTopActionButton(
-                        onTap: _openAnnouncementNotifications,
-                      ),
-                      if (_unreadAnnouncementCount > 0)
-                        Positioned(
-                          right: 1,
-                          top: 1,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _gold,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                                  Icons.person_outline_rounded,
+                                  color: _brandBlue)))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Mabuhay,',
+                        style:
+                            TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    const SizedBox(height: 3),
+                    Text(_fullName.isEmpty ? 'Resident' : _fullName,
+                        style: const TextStyle(
+                            color: Color(0xFF172B46),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            letterSpacing: -0.4)),
+                  ])),
+              const SizedBox(width: 8),
+              Badge(
+                  isLabelVisible: _unreadAnnouncementCount > 0,
+                  backgroundColor: _gold,
+                  smallSize: 8,
+                  child: _buildTopActionButton(
+                      onTap: _openAnnouncementNotifications)),
+            ]),
+            const SizedBox(height: 22),
             Container(
-              width: double.infinity,
-              color: Color(0xFF006CBF),
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-              child: const Text(
-                "Stay updated with the latest community news and access essential barangay services.",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  height: 1.35,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF0B4F94), Color(0xFF0879BF)])),
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text('Your barangay, connected.',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.25,
+                                    letterSpacing: -0.3)),
+                            SizedBox(height: 8),
+                            Text(
+                                'Community updates and everyday services, all in one place.',
+                                style: TextStyle(
+                                    color: Color(0xFFE0EFFF),
+                                    fontSize: 13,
+                                    height: 1.5)),
+                          ])),
+                      if (MediaQuery.textScalerOf(context).scale(1) <= 1.3) ...[
+                        const SizedBox(width: 12),
+                        SvgPicture.asset('lib/assets/bancao-connect-mark.svg',
+                            width: 52, height: 52),
+                      ],
+                    ])),
+          ]),
+        ));
   }
 
   Widget _buildStyledHomeTab() {
@@ -3457,7 +3161,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               children: [
                 const SizedBox(height: 2),
                 _buildSectionHeader(
-                  title: "Announcement",
+                  title: "Announcements",
                   actionText: "View all",
                   onAction: _openAnnouncementNotifications,
                 ),
@@ -3467,11 +3171,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Quick Actions",
                   style: TextStyle(
-                    color: Color(0xFF424751),
+                    color: Color(0xFF172B46),
                     fontSize: 18,
                     height: 28 / 18,
                     letterSpacing: 0,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3500,11 +3204,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Ongoing Services",
                   style: TextStyle(
-                    color: Color(0xFF424751),
+                    color: Color(0xFF172B46),
                     fontSize: 18,
                     height: 28 / 18,
                     letterSpacing: 0,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3568,11 +3272,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 const Text(
                   "Recent Activity",
                   style: TextStyle(
-                    color: Color(0xFF424751),
+                    color: Color(0xFF172B46),
                     fontSize: 18,
                     height: 28 / 18,
                     letterSpacing: 0,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3687,15 +3391,20 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                             });
                           })
                       : null,
-                  child: Text(
-                    sectionLabel,
-                    style: TextStyle(
-                      color: _brandBlue,
-                      fontSize: 18,
-                      fontWeight:
-                          allowBackToMenu ? FontWeight.w700 : FontWeight.w600,
-                    ),
-                  ),
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (allowBackToMenu) ...[
+                          const Icon(Icons.arrow_back_rounded,
+                              size: 18, color: _brandBlue),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(sectionLabel,
+                            style: const TextStyle(
+                                color: _brandBlue,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                      ])),
                 ),
                 const Spacer(),
                 _buildTopActionButton(
@@ -3703,24 +3412,24 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 ),
               ],
             ),
-            SizedBox(height: compact ? 8 : 30),
+            SizedBox(height: compact ? 8 : 20),
             Text(
               title,
               style: TextStyle(
                 color: const Color(0xFF004687),
-                fontSize: compact ? 22 : 40,
-                fontWeight: FontWeight.w800,
-                height: 1.12,
+                fontSize: compact ? 22 : 28,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
               ),
             ),
             if (!compact) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               Text(
                 subtitle,
                 style: const TextStyle(
                   color: Color(0xFF424751),
-                  fontSize: 18,
-                  height: 1.4,
+                  fontSize: 14,
+                  height: 1.5,
                 ),
               ),
             ],
@@ -3741,77 +3450,56 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: borderColor)),
       child: InkWell(
         onTap: () => _runAction(onTap),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(30, 32, 28, 32),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
+        child: Padding(
+            padding: const EdgeInsets.all(20),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 35),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF000000),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                description,
-                style: const TextStyle(
-                  color: Color(0xFF424751),
-                  fontSize: 15,
-                  height: 1.45,
-                ),
-              ),
+                        color: background,
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Icon(icon, color: accent, size: 29)),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: Text(title,
+                        style: const TextStyle(
+                            color: Color(0xFF172B46),
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3))),
+              ]),
+              const SizedBox(height: 16),
+              Text(description,
+                  style: const TextStyle(
+                      color: Color(0xFF64748B), fontSize: 14, height: 1.5)),
               const SizedBox(height: 18),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    cta,
-                    style: const TextStyle(
-                      color: _brandBlue,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: _brandBlue,
-                    size: 19,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                      color: background,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Row(children: [
+                    Expanded(
+                        child: Text(cta,
+                            style: const TextStyle(
+                                color: _brandBlue,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700))),
+                    const Icon(Icons.arrow_forward_rounded,
+                        size: 18, color: _brandBlue),
+                  ])),
+            ])),
       ),
     );
   }
@@ -4007,9 +3695,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       children: [
         _buildServicesTopBar(
           sectionLabel: "Services",
-          title: "How can we assist\nyou today?",
+          title: "How can we help?",
           subtitle:
-              "Access essential barangay services, request official documentation, or report local concerns directly to your community leaders.",
+              "Report a concern or request a document from your barangay.",
         ),
         Expanded(
           child: ScrollConfiguration(
@@ -4033,7 +3721,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   title: "File a Report",
                   description:
                       "Report non-emergency infrastructure issues or community concerns directly.",
-                  cta: "PROCEED",
+                  cta: "Start a report",
                   onTap: () {
                     setState(() {
                       _serviceView = _ResidentServiceView.reportForm;
@@ -4049,7 +3737,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   title: "Request Certificate",
                   description:
                       "Apply for Barangay Clearance, Residency, and other official documents.",
-                  cta: "APPLY NOW",
+                  cta: "Request a document",
                   onTap: () {
                     setState(() {
                       _serviceView = _ResidentServiceView.certificates;
@@ -4687,118 +4375,96 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ? Icons.task_alt_outlined
             : Icons.campaign_outlined;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _runAction(
-          () => isDocumentRequest
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.white,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFE3EAF2))),
+        child: InkWell(
+          onTap: () => _runAction(() => isDocumentRequest
               ? _showDocumentRequestDetails(report)
-              : _showReportDetails(report),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2F5F8),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  iconData,
-                  color: const Color(0xFF000000),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
+              : _showReportDetails(report)),
+          child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusChipStyle.bg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: TextStyle(
-                          color: statusChipStyle.text,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF1F2937),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF424751),
-                        fontSize: 14,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => _runAction(
-                        () => _showReportDetails(report),
-                      ),
-                      borderRadius: BorderRadius.circular(999),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "View details",
-                              style: TextStyle(
-                                color: _brandBlue,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                    Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                  color: _softBlue,
+                                  borderRadius: BorderRadius.circular(14)),
+                              child:
+                                  Icon(iconData, color: _brandBlue, size: 24)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(
+                                    isDocumentRequest
+                                        ? 'DOCUMENT REQUEST'
+                                        : 'COMMUNITY REPORT',
+                                    style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 10,
+                                        letterSpacing: 0.6,
+                                        fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 5),
+                                Text(title,
+                                    style: const TextStyle(
+                                        color: Color(0xFF172B46),
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.3)),
+                              ])),
+                        ]),
+                    const SizedBox(height: 14),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                            height: 1.4)),
+                    const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: Divider(height: 1, color: Color(0xFFEDF1F6))),
+                    Row(children: [
+                      Flexible(
+                          child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                  color: statusChipStyle.bg,
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: Text(statusLabel,
+                                  style: TextStyle(
+                                      color: statusChipStyle.text,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700)))),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                            Flexible(
+                                child: Text('View details',
+                                    style: TextStyle(
+                                        color: _brandBlue,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600))),
                             SizedBox(width: 4),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: _brandBlue,
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                            Icon(Icons.arrow_forward_rounded,
+                                size: 16, color: _brandBlue),
+                          ])),
+                    ]),
+                  ])),
         ),
       ),
     );
@@ -4839,36 +4505,29 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ),
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: () => _runAction(
             () => _openCertificateRequestForm(item),
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           child: Ink(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE9EDF2)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x0A101828),
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
-              ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               child: Row(
                 children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: background,
                       borderRadius: BorderRadius.circular(9),
                     ),
-                    child: Icon(icon, color: accent, size: 18),
+                    child: Icon(icon, color: accent, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -4879,7 +4538,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                           title,
                           style: const TextStyle(
                             color: Color(0xFF2A2F35),
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             height: 1.2,
                           ),
@@ -4889,7 +4548,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                           description,
                           style: const TextStyle(
                             color: Color(0xFF667085),
-                            fontSize: 12.5,
+                            fontSize: 13,
                             height: 1.3,
                           ),
                         ),
@@ -5594,9 +5253,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       children: [
         _buildServicesTopBar(
           sectionLabel: "Activity",
-          title: "Monitor your activity",
+          title: "Your activity",
           subtitle:
-              "Monitor the real-time status of your active requests and incident reports.",
+              "Follow the progress of your reports and document requests.",
         ),
         Expanded(
           child: Padding(
@@ -5707,19 +5366,19 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFF5F7FA),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              size: 25,
+              size: 22,
               color: _brandBlue,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -5738,9 +5397,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   text,
                   style: const TextStyle(
                     color: Color(0xFF111827),
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    height: 1.25,
+                    height: 1.45,
                   ),
                 ),
               ],
@@ -5752,58 +5411,30 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _buildProfileHeaderAvatar() {
-    const avatarSize = 122.0;
-    const badgeBoxSize = avatarSize * 0.36;
-    const badgeScale = 1.42;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: avatarSize,
-          height: avatarSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFD7E5F5), width: 3),
-            image: _profileImage.trim().isEmpty
-                ? null
-                : DecorationImage(
-                    image: NetworkImage(_profileImage),
-                    fit: BoxFit.cover,
-                  ),
-          ),
-          child: _profileImage.trim().isEmpty
-              ? const Icon(
-                  Icons.person,
-                  size: 66,
-                  color: Color(0xFFD0D6DC),
-                )
-              : null,
-        ),
-        Positioned(
-          right: -(badgeBoxSize * 0.18),
-          bottom: -(badgeBoxSize * 0.16),
-          child: Container(
-            width: badgeBoxSize,
-            height: badgeBoxSize,
-            alignment: Alignment.center,
-            child: Transform.scale(
-              scale: badgeScale,
-              child: SvgPicture.asset(
-                _verifiedCheckAsset,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ),
-      ],
+    const fallback =
+        Icon(Icons.person_outline_rounded, size: 42, color: _brandBlue);
+    return Container(
+      width: 88,
+      height: 88,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFCCDFF4), width: 2)),
+      child: ClipOval(
+          child: ColoredBox(
+              color: _softBlue,
+              child: _profileImage.trim().isEmpty
+                  ? fallback
+                  : Image.network(_profileImage.trim(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => fallback))),
     );
   }
 
   Widget _buildVerifiedResidentBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: const Color(0xFFD9EBFF),
         borderRadius: BorderRadius.circular(999),
@@ -5816,18 +5447,18 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             width: 10,
             height: 12,
             colorFilter: const ColorFilter.mode(
-              Color(0xFF5B7692),
+              _brandBlue,
               BlendMode.srcIn,
             ),
           ),
           const SizedBox(width: 5),
           const Text(
-            "VERIFIED RESIDENT",
+            "Verified resident",
             style: TextStyle(
-              color: Color(0xFF5B7692),
-              fontSize: 10,
+              color: _brandBlue,
+              fontSize: 11,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+              letterSpacing: 0.1,
               height: 1,
             ),
           ),
@@ -6132,29 +5763,36 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Center(child: _buildProfileHeaderAvatar()),
-          const SizedBox(height: 14),
-          Center(
-            child: Text(
-              _fullName.isEmpty ? "Resident" : _fullName,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                height: 1.15,
-              ),
-            ),
-          ),
-          const SizedBox(height: 7),
-          Center(child: _buildVerifiedResidentBadge()),
+          Container(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFDCE8F6)),
+                  gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFFEAF3FF), Color(0xFFFFFFFF)])),
+              child: Column(children: [
+                _buildProfileHeaderAvatar(),
+                const SizedBox(height: 14),
+                Text(_fullName.isEmpty ? 'Resident' : _fullName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Color(0xFF172B46),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                        height: 1.25)),
+                const SizedBox(height: 10),
+                _buildVerifiedResidentBadge(),
+              ])),
           const SizedBox(height: 26),
           const Text(
             "Personal Information",
             style: TextStyle(
               color: Color(0xFF111827),
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
@@ -6162,7 +5800,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE3EAF2)),
             ),
             child: Column(
               children: [
@@ -6192,14 +5831,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             style: TextStyle(
               color: Color(0xFF111827),
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE3EAF2)),
             ),
             child: Column(
               children: [
@@ -6235,14 +5875,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             style: TextStyle(
               color: Color(0xFF111827),
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE3EAF2)),
             ),
             child: Column(
               children: [
@@ -6316,8 +5957,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         selectedIndex: _currentTab,
         onDestinationSelected: _onDestinationSelected,
         backgroundColor: Colors.white,
-        indicatorColor: Colors.transparent,
-        surfaceTintColor: Colors.white,
+        indicatorColor: const Color(0xFFE4EFFC),
+        surfaceTintColor: Colors.transparent,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
           if (states.contains(WidgetState.selected)) {

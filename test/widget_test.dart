@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:capstone_app/main.dart';
 import 'package:capstone_app/core/supabase_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:capstone_app/screens/auth/login_screen.dart';
 import 'package:capstone_app/screens/auth/register_screen.dart';
+import 'package:capstone_app/widgets/app_launch_view.dart';
 import 'package:capstone_app/screens/residents/resident_dashboard_screen.dart';
 import 'app_interactions_test.dart' show testApp, captureUi, loadAppTestFonts;
 
@@ -29,12 +32,22 @@ class _MemoryPkceStorage extends GotrueAsyncStorage {
 }
 
 void main() {
+  late BuiltInMapCachingProvider mapCache;
+
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
     await loadAppTestFonts();
-    // MyApp's route table creates AuthService during widget mounting. The
-    // production entry point initializes Supabase before runApp, so mirror
-    // that boundary here without making any network requests or using data.
+    // Widget tests have no native path_provider plugin. Give the map an
+    // isolated cache instead of asking the platform for its cache directory.
+    final buildDirectory = await Directory('build').create(recursive: true);
+    final cacheDirectory = await buildDirectory.createTemp('widget-map-cache-');
+    mapCache = BuiltInMapCachingProvider.getOrCreateInstance(
+      cacheDirectory: cacheDirectory.absolute.path,
+      maxCacheSize: null,
+      readOnly: true,
+    );
+    // Initialize the same boundary used by the intro screen without persisting
+    // a session or making authentication requests.
     await SupabaseConfig.initialize(
       authOptions: FlutterAuthClientOptions(
         localStorage: const EmptyLocalStorage(),
@@ -43,6 +56,8 @@ void main() {
       ),
     );
   });
+
+  tearDownAll(() => mapCache.destroy(deleteCache: true));
 
   testWidgets('mobile app builds its MaterialApp shell', (tester) async {
     await tester.pumpWidget(const MyApp());
@@ -62,7 +77,7 @@ void main() {
     await tester.runAsync(() => GoogleFonts.pendingFonts());
     await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('BancaoConnect'), findsNothing);
+    expect(find.byType(AppLaunchView), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

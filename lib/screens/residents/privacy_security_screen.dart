@@ -12,7 +12,7 @@ class PrivacySecurityScreen extends StatefulWidget {
 
 class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   static const Color _brandBlue = Color(0xFF0B4F94);
-  static const Color _pageBackground = Color(0xFFF4F6F7);
+  static const Color _pageBackground = Color(0xFFF8FAFC);
   final SupabaseClient _supabase = Supabase.instance.client;
 
   final TextEditingController _newPasswordController = TextEditingController();
@@ -268,7 +268,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
         foregroundColor: _brandBlue,
         titleTextStyle: const TextStyle(
           color: _brandBlue,
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
       ),

@@ -251,18 +251,18 @@ class _LoginScreenState extends State<LoginScreen>
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(
           color: hasError ? _errorColor : _brandBlue,
           width: 1.4,
         ),
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: borderColor),
       ),
     );
@@ -274,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: _errorBackground,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _errorBorder),
       ),
       child: Row(
@@ -313,10 +313,10 @@ class _LoginScreenState extends State<LoginScreen>
     final logoSize = isCompactPhone ? 86.0 : 96.0; // ***** Logo size *****
     final titleFontSize =
         isCompactPhone ? 28.0 : 30.0; // ***** Title font size *****
-    final subtitleFontSize = 16.0; // ***** Subtitle font size *****
+    final subtitleFontSize = 14.0; // ***** Subtitle font size *****
     final formTopSpacing = isCompactPhone
-        ? 44.0
-        : 52.0; // ***** Form container starting position *****
+        ? 28.0
+        : 36.0; // ***** Form container starting position *****
     final inputFieldHeight =
         isCompactPhone ? 56.0 : 58.0; // ***** Input field height *****
     final buttonHeight =
@@ -340,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Bancao-Bancao App',
+                  'BancaoConnect',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.publicSans(
                     color: _brandBlue,
@@ -352,7 +352,7 @@ class _LoginScreenState extends State<LoginScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 42),
                   child: Text(
-                    'Access your community civic portal\nand stay connected with local\nservices.',
+                    'Stay connected with your barangay.\nYour community services start here.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       color: const Color(0xFF424751),

@@ -366,10 +366,10 @@ class _RegisterVerificationScreenState
                 _buildSectionTitle(3, 'Verification'),
                 const SizedBox(height: 12),
                 const Text(
-                  'Take Photo of Your ID',
+                  'Verify your identity',
                   style: TextStyle(
                     color: Color(0xFF11151A),
-                    fontSize: 32,
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
