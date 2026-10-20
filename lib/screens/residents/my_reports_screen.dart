@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../widgets/app_status_message.dart';
 import '../../widgets/top_toast.dart';
+import '../../services/private_file_service.dart';
 
 /// This screen shows ONLY the reports
 /// submitted by the currently logged-in resident.
@@ -49,10 +50,14 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
+      final resolved = await PrivateFileService.resolveRecords(
+        List<Map<String, dynamic>>.from(data),
+      );
+
       if (!mounted) return;
       setState(() {
         _loadFailed = false;
-        reports = data;
+        reports = resolved;
         isLoading = false;
       });
     } catch (_) {

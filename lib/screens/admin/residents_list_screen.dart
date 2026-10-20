@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../widgets/top_toast.dart';
 import '../../widgets/app_status_message.dart';
 import 'add_resident_screen.dart';
+import '../../services/private_file_service.dart';
 
 class ResidentsListScreen extends StatefulWidget {
   const ResidentsListScreen({super.key});
@@ -70,11 +71,15 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
           .select()
           .order('created_at', ascending: false);
 
+      final resolved = await PrivateFileService.resolveRecords(
+        List<Map<String, dynamic>>.from(data),
+      );
+
       if (!mounted) return;
 
       setState(() {
         _loadFailed = false;
-        residents = List<Map<String, dynamic>>.from(data);
+        residents = resolved;
         isLoading = false;
       });
     } catch (_) {

@@ -12,6 +12,7 @@ import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/announcement_model.dart';
 import '../../services/announcement_service.dart';
+import '../../services/private_file_service.dart';
 import '../../widgets/top_toast.dart';
 import '../../widgets/app_selection_field.dart';
 import '../../widgets/app_tap_surface.dart';
@@ -288,6 +289,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
       if (data == null) return;
 
+      final resolved = (await PrivateFileService.resolveRecords([data])).first;
+      if (!mounted) return;
+
       setState(() {
         _fullName = (data['full_name'] as String?)?.trim().isNotEmpty == true
             ? data['full_name']
@@ -299,7 +303,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             (data['contact_number'] as String?)?.trim().isNotEmpty == true
                 ? data['contact_number']
                 : _contactNumber;
-        _profileImage = (data['profile_image'] as String?) ?? "";
+        _profileImage = (resolved['profile_image'] as String?) ?? "";
       });
     } catch (_) {
       return;
@@ -442,11 +446,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
+      final resolved = await PrivateFileService.resolveRecords(
+        List<Map<String, dynamic>>.from(data),
+      );
+
       if (!mounted) return;
 
       setState(() {
         _reportsLoadFailed = false;
-        _reports = List<Map<String, dynamic>>.from(data).map((report) {
+        _reports = resolved.map((report) {
           return {
             ...report,
             'activity_type': 'report',
@@ -476,12 +484,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
+      final resolved = await PrivateFileService.resolveRecords(
+        List<Map<String, dynamic>>.from(data),
+      );
+
       if (!mounted) return;
 
       setState(() {
         _documentsLoadFailed = false;
-        _documentRequests =
-            List<Map<String, dynamic>>.from(data).map((request) {
+        _documentRequests = resolved.map((request) {
           return {
             ...request,
             'activity_type': 'document_request',

@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local test backend selection (does not replace the main configuration).
+/config/supabase.test.json

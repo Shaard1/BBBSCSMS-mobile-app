@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/private_file_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -32,9 +33,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .select()
           .order('created_at', ascending: false);
 
+      final resolved = await PrivateFileService.resolveRecords(
+        List<Map<String, dynamic>>.from(response),
+      );
+
       if (!mounted) return;
       setState(() {
-        reports = response;
+        reports = resolved;
         isLoading = false;
       });
     } catch (_) {
