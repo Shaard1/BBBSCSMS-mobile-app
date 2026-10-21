@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (_isLoading) return;
 
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
     final validationMessage = _validateLoginInput(email, password);
 
     if (validationMessage != null) {

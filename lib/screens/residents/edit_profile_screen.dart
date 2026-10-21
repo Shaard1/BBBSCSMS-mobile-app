@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../widgets/top_toast.dart';
+import '../../services/basic_account_service.dart';
 import '../../widgets/app_tap_surface.dart';
 import '../crop_screen.dart';
 
@@ -156,13 +157,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final address = _addressController.text.trim();
     final contactNumber = _contactController.text.trim();
 
-    if (fullName.isEmpty || address.isEmpty || contactNumber.isEmpty) {
-      _showTopToast("Please fill in your name, address, and contact number.");
+    if (fullName.isEmpty || contactNumber.isEmpty) {
+      _showTopToast("Please fill in your name and contact number.");
       return;
     }
 
-    if (!RegExp(r'^\d{11}$').hasMatch(contactNumber)) {
-      _showTopToast("Please enter exactly 11 digits for contact number.");
+    if (BasicAccountService.normalizePhone(contactNumber) == null) {
+      _showTopToast("Enter a valid Philippine mobile number.");
       return;
     }
 
@@ -178,7 +179,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final payload = <String, dynamic>{
         'full_name': fullName,
         'address': address,
-        'contact_number': contactNumber,
+        'contact_number': BasicAccountService.normalizePhone(contactNumber),
       };
 
       if (_newProfileImage != null) {
@@ -280,9 +281,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (digits.startsWith('63') && digits.length == 12) {
       return '0${digits.substring(2)}';
     }
-    if (digits.length > 11) {
-      return digits.substring(0, 11);
-    }
+
     return digits;
   }
 
@@ -448,7 +447,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      decoration: _fieldDecoration("Contact number"),
+                      decoration: _fieldDecoration("Contact number").copyWith(
+                        helperText:
+                            "Contact details do not verify or change your sign-in number.",
+                        helperMaxLines: 2,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     SizedBox(

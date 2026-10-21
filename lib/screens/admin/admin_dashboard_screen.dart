@@ -116,12 +116,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           children: [
                             ElevatedButton(
                               onPressed: () =>
-                                  updateStatus(report['id'], 'in_process'),
+                                  updateStatus(report['id'], 'in progress'),
                               child: const Text("In Process"),
                             ),
                             ElevatedButton(
                               onPressed: () =>
-                                  updateStatus(report['id'], 'completed'),
+                                  updateStatus(report['id'], 'resolved'),
                               child: const Text("Completed"),
                             ),
                           ],

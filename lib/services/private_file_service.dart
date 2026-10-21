@@ -14,6 +14,9 @@ class PrivateFileService {
     'image_url',
     'image_urls',
     'payment_proof_url',
+    'identity_evidence_url',
+    'residency_evidence_url',
+    'authorization_evidence_url',
   ];
 
   static Future<List<Map<String, dynamic>>> resolveRecords(
@@ -28,6 +31,9 @@ class PrivateFileService {
           final list = jsonDecode(value);
           if (list is List) return Future.wait(list.map(resolve));
         } on FormatException {/* Continue with locator parsing. */}
+      }
+      if (value.startsWith('resident-files/')) {
+        value = '${SupabaseConfig.supabaseUrl}/storage/v1/object/public/$value';
       }
       final uri = Uri.tryParse(value);
       final configured = Uri.parse(SupabaseConfig.supabaseUrl);

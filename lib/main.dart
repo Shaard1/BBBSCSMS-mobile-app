@@ -7,6 +7,8 @@ import 'core/app_theme.dart';
 
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+import 'screens/auth/basic_register_screen.dart';
+import 'services/basic_account_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/admin/residents_list_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -45,7 +47,9 @@ class MyApp extends StatelessWidget {
       routes: {
         '/intro': (context) => AppIntroScreen(initialize: initialize),
         '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
+        '/register': (context) => BasicAccountService.previewEnabled
+            ? const BasicRegisterScreen()
+            : const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
         '/residents': (context) => const ResidentsListScreen(),
         '/admin': (context) => const AdminDashboardScreen(),

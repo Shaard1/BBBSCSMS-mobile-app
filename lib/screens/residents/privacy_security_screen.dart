@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/basic_account_service.dart';
 
 import '../../widgets/top_toast.dart';
 
@@ -27,6 +28,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
 
   String _email = "Not available";
   String _status = "Unknown";
+  BasicAccountAccess? _accountAccess;
   String _role = "Resident";
 
   @override
@@ -54,6 +56,9 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     }
 
     try {
+      final accountAccess = BasicAccountService.previewEnabled
+          ? await BasicAccountService().access()
+          : null;
       final resident = await _supabase
           .from('residents')
           .select('status')
@@ -68,12 +73,13 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
 
       if (!mounted) return;
       setState(() {
+        _accountAccess = accountAccess;
         _email = (user.email?.trim().isNotEmpty ?? false)
             ? user.email!.trim()
             : "Not available";
         _status = (resident?['status'] as String?)?.trim().isNotEmpty == true
             ? resident!['status']
-            : "Approved";
+            : "Unknown";
         _role = (profile?['role'] as String?)?.trim().isNotEmpty == true
             ? profile!['role']
             : "resident";
@@ -115,11 +121,12 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   Future<void> _changePassword() async {
     if (_isSavingPassword) return;
 
-    final newPassword = _newPasswordController.text.trim();
-    final confirmPassword = _confirmPasswordController.text.trim();
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
 
-    if (newPassword.length < 6) {
-      _showSnackBar("Password must be at least 6 characters.");
+    final passwordError = BasicAccountService.validatePassword(newPassword);
+    if (passwordError != null) {
+      _showSnackBar(passwordError);
       return;
     }
 
@@ -255,7 +262,16 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(_status);
+    final accessLabel = _accountAccess == null
+        ? 'Legacy: ${_statusLabel(_status)}'
+        : _accountAccess!.active
+            ? 'Active'
+            : 'Suspended';
+    final statusColor = _accountAccess == null
+        ? _statusColor(_status)
+        : _accountAccess!.active
+            ? const Color(0xFF2E7D32)
+            : const Color(0xFFD9534F);
 
     return Scaffold(
       backgroundColor: _pageBackground,
@@ -311,7 +327,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                           ),
                         ),
                         _buildInfoRow(
-                          label: "Status",
+                          label: "Access",
                           value: Align(
                             alignment: Alignment.centerLeft,
                             child: Container(
@@ -324,7 +340,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                _statusLabel(_status),
+                                accessLabel,
                                 style: TextStyle(
                                   color: statusColor,
                                   fontWeight: FontWeight.w700,
@@ -343,6 +359,15 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                             ),
                           ),
                         ),
+                        if (_accountAccess != null) ...[
+                          _buildInfoRow(
+                              label: 'Phone',
+                              value: Text(_accountAccess!.phoneVerified
+                                  ? 'Verified through SMS'
+                                  : 'Not verified through SMS')),
+                          const Text(
+                              'Identity and residency checks are recorded within each document application. Account access does not approve document release.'),
+                        ],
                       ],
                     ),
                   ),

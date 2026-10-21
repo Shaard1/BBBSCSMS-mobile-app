@@ -63,6 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
+      if (data['role'] == 'resident') {
+        await AuthService().validateBasicAccount();
+      }
       if (!mounted) return;
       setState(() {
         fullName = data['full_name'] ?? '';

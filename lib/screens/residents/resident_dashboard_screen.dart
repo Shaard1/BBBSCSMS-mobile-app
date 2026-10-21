@@ -1,3 +1,4 @@
+import '../../widgets/document_submitted_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -13,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/announcement_model.dart';
 import '../../services/announcement_service.dart';
 import '../../services/private_file_service.dart';
+import '../../services/basic_account_service.dart';
 import '../../widgets/top_toast.dart';
 import '../../widgets/app_selection_field.dart';
 import '../../widgets/app_tap_surface.dart';
@@ -23,6 +25,7 @@ import 'announcement_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_security_screen.dart';
 import 'report_location_picker_screen.dart';
+import 'document_evidence_screen.dart';
 
 class ResidentDashboardScreen extends StatefulWidget {
   final String name;
@@ -69,9 +72,8 @@ enum _ResidentServiceView {
 class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   static const String _verifiedShieldAsset =
       'lib/assets/Verified Resident badge.svg';
-  static const String _demoGcashReceiverName = 'Demo GCash Receiver';
-  static const String _demoGcashReceiverNumber = '09XXXXXXXXX';
   final SupabaseClient _supabase = Supabase.instance.client;
+  BasicAccountAccess? _accountAccess;
   final AnnouncementService _announcementService = AnnouncementService();
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _descriptionController = TextEditingController();
@@ -81,7 +83,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       'address',
       'contact_number',
       'email',
-      'payment_reference',
       'date_of_birth',
       'civil_status',
       'purpose',
@@ -148,9 +149,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   final _reportLocationKey = GlobalKey();
   bool _isSubmittingCertificateRequest = false;
   bool _isFetchingLocation = false;
-  bool _notifyAnnouncements = true;
-  bool _notifyReportUpdates = true;
-  bool _notifyDocumentUpdates = true;
   String _selectedAnnouncementFilter = "All";
 
   String _fullName = "";
@@ -159,9 +157,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   String _profileImage = "";
   String _reportLocationLabel = "Tap to choose location on map";
   Map<String, dynamic>? _selectedCertificateRequest;
-  String _selectedCertificatePaymentMethod = "GCash";
   String _selectedCertificateVariant = "Good Moral";
-  File? _selectedPaymentProofImage;
 
   static const int _maxReportImages = 10;
   final List<File> _selectedReportImages = [];
@@ -279,6 +275,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     }
 
     try {
+      final access = BasicAccountService.previewEnabled
+          ? await BasicAccountService().access()
+          : null;
       final data = await _supabase
           .from('residents')
           .select('full_name, address, contact_number, profile_image')
@@ -293,6 +292,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       if (!mounted) return;
 
       setState(() {
+        _accountAccess = access;
         _fullName = (data['full_name'] as String?)?.trim().isNotEmpty == true
             ? data['full_name']
             : _fullName;
@@ -303,6 +303,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             (data['contact_number'] as String?)?.trim().isNotEmpty == true
                 ? data['contact_number']
                 : _contactNumber;
+        if (access?.declaredPhone?.isNotEmpty == true) {
+          _contactNumber = access!.declaredPhone!;
+        }
         _profileImage = (resolved['profile_image'] as String?) ?? "";
       });
     } catch (_) {
@@ -2355,7 +2358,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     _populateCertificateFormDefaults();
     setState(() {
       _selectedCertificateRequest = certificate;
-      _selectedCertificatePaymentMethod = "GCash";
+
       _selectedCertificateVariant = "Good Moral";
       _serviceView = _ResidentServiceView.certificateRequestForm;
     });
@@ -2381,9 +2384,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         entry.value.clear();
       }
     }
-    _selectedCertificatePaymentMethod = "GCash";
+
     _selectedCertificateVariant = "Good Moral";
-    _selectedPaymentProofImage = null;
   }
 
   bool _validateCertificateRequest() {
@@ -2454,25 +2456,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       }
     }
 
-    if (_selectedCertificatePaymentMethod == "GCash") {
-      if (_certificateControllers['payment_reference']!.text.trim().isEmpty) {
-        _showSnackBar("Please enter the GCash reference number.");
-        return false;
-      }
-      if (_selectedPaymentProofImage == null) {
-        _showSnackBar("Please upload your payment proof screenshot.");
-        return false;
-      }
-    }
-
     return true;
   }
 
   Map<String, dynamic> _buildCertificateRequestPayload(
     Map<String, dynamic> certificate,
-    User user, {
-    String? paymentProofUrl,
-  }) {
+    User user,
+  ) {
     final sanitizedFormData = <String, dynamic>{};
 
     for (final entry in _certificateControllers.entries) {
@@ -2481,8 +2471,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         sanitizedFormData[entry.key] = value;
       }
     }
-
-    final feeLabel = certificate['fee'] as String? ?? 'Free';
 
     return {
       'user_id': user.id,
@@ -2500,72 +2488,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       'contact_number': _certificateControllers['contact_number']!.text.trim(),
       'email': _certificateControllers['email']!.text.trim(),
       'address': _certificateControllers['address']!.text.trim(),
-      'payment_method': _selectedCertificatePaymentMethod,
-      'payment_receiver_name': _selectedCertificatePaymentMethod == 'GCash'
-          ? _demoGcashReceiverName
-          : null,
-      'payment_receiver_number': _selectedCertificatePaymentMethod == 'GCash'
-          ? _demoGcashReceiverNumber
-          : null,
-      'payment_reference': _selectedCertificatePaymentMethod == 'GCash'
-          ? _certificateControllers['payment_reference']!.text.trim()
-          : null,
-      'payment_proof_url': paymentProofUrl,
-      'payment_submitted_at': _selectedCertificatePaymentMethod == 'GCash'
-          ? DateTime.now().toIso8601String()
-          : null,
-      'fee_label': feeLabel,
-      'fee_amount': _parseCertificateFeeAmount(feeLabel),
+      'payment_method': 'office',
       'purpose': _certificateControllers['purpose']!.text.trim(),
       'additional_notes':
           _certificateControllers['additional_notes']!.text.trim().isEmpty
               ? null
               : _certificateControllers['additional_notes']!.text.trim(),
       'form_data': sanitizedFormData,
-      'status': _selectedCertificatePaymentMethod == 'GCash'
-          ? 'awaiting_payment'
-          : 'pending',
+      'status': 'pending',
     };
-  }
-
-  Future<void> _pickPaymentProofImage() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-
-    if (picked == null || !mounted) return;
-
-    setState(() {
-      _selectedPaymentProofImage = File(picked.path);
-    });
-  }
-
-  Future<String?> _uploadPaymentProofImage(File imageFile) async {
-    try {
-      final fileName = path.basename(imageFile.path);
-      final userId = _supabase.auth.currentUser!.id;
-      final filePath =
-          "document-payment-proofs/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName";
-
-      await _supabase.storage.from('resident-files').upload(
-            filePath,
-            imageFile,
-            fileOptions: const FileOptions(upsert: true),
-          );
-
-      return _supabase.storage.from('resident-files').getPublicUrl(filePath);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  double _parseCertificateFeeAmount(String feeLabel) {
-    final normalizedFee = feeLabel.toLowerCase();
-    if (normalizedFee.contains('free')) return 0;
-
-    final digitsOnly = feeLabel.replaceAll(RegExp(r'[^0-9.]'), '');
-    return double.tryParse(digitsOnly) ?? 0;
   }
 
   Future<void> _submitCertificateRequestForm() async {
@@ -2582,22 +2513,20 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     setState(() => _isSubmittingCertificateRequest = true);
 
     try {
-      String? paymentProofUrl;
-      if (_selectedCertificatePaymentMethod == 'GCash' &&
-          _selectedPaymentProofImage != null) {
-        paymentProofUrl =
-            await _uploadPaymentProofImage(_selectedPaymentProofImage!);
-
-        if (paymentProofUrl == null) {
-          throw Exception('Payment proof upload failed');
-        }
+      if (await _supabase.rpc('office_document_workflow_available') != true) {
+        throw StateError('Document workflow unavailable');
       }
-
-      final payload = _buildCertificateRequestPayload(
-        certificate,
-        user,
-        paymentProofUrl: paymentProofUrl,
-      );
+      if (!mounted) return;
+      final evidence = await Navigator.push<Map<String, dynamic>>(
+          context,
+          MaterialPageRoute(
+              builder: (_) =>
+                  DocumentEvidenceScreen(requesterName: _fullName)));
+      if (evidence == null || !mounted) return;
+      final payload = {
+        ..._buildCertificateRequestPayload(certificate, user),
+        ...evidence
+      };
 
       await _supabase.from('document_requests').insert(payload);
 
@@ -2629,71 +2558,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Request Submitted',
-                  style: TextStyle(
-                    color: _brandBlue,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Your $certificateTitle request has been submitted successfully. Please wait for barangay staff to review your request and payment details.',
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 15,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      setState(() {
-                        _resetCertificateRequestForm();
-                        _selectedCertificateRequest = null;
-                        _serviceView = _ResidentServiceView.menu;
-                        _currentTab = 2;
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _brandBlue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        return DocumentSubmittedDialog(
+            documentTitle: certificateTitle,
+            onViewRequests: () {
+              Navigator.pop(dialogContext);
+              setState(() {
+                _resetCertificateRequestForm();
+                _selectedCertificateRequest = null;
+                _serviceView = _ResidentServiceView.menu;
+                _currentTab = 2;
+              });
+            });
       },
     );
   }
@@ -4137,6 +4012,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 22),
+                  if (request['workflow_version'] == 2) ...[
+                    _buildDocumentDetailSection(
+                        title: 'Office verification and collection',
+                        body:
+                            'Identity: ${request['identity_checked'] == true ? 'Checked' : 'Awaiting staff check'}\nResidency: ${request['residency_checked'] == true ? 'Checked' : 'Awaiting staff check'}\n${request['requester_capacity'] == 'representative' ? 'Representative authorization: ${request['authorization_checked'] == true ? 'Checked' : 'Awaiting staff check'}\n' : ''}Payment: ${request['office_payment_status'] ?? 'pending'} at the barangay office. Bring originals for any in-person checks. Collect the document at the office after approval.'),
+                    const SizedBox(height: 18),
+                  ],
                   _buildDocumentDetailSection(
                     title: "Purpose of Request",
                     body: purpose.isEmpty ? "No purpose provided." : purpose,
@@ -4718,13 +4600,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               const SizedBox(height: 10),
               _buildCertificateTextField(
                 fieldKey: 'full_name',
-                label: 'Full Name',
-                hint: 'Enter your full name',
+                label: 'Name on the requested document',
+                hint: 'Full name of the person the document is for',
               ),
               _buildCertificateTextField(
                 fieldKey: 'address',
-                label: 'Address',
-                hint: 'Enter your address',
+                label: 'Applicant residential address',
+                hint: 'Address of the person the document is for',
               ),
               _buildCertificateTextField(
                 fieldKey: 'contact_number',
@@ -4761,22 +4643,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 maxLines: 3,
               ),
               const SizedBox(height: 8),
-              _buildReportSectionTitle("Payment Method"),
+              _buildReportSectionTitle("Payment and collection"),
               const SizedBox(height: 10),
-              _buildCertificatePaymentMethodSelector(),
-              if (_selectedCertificatePaymentMethod == "GCash") ...[
-                const SizedBox(height: 14),
-                _buildGcashPaymentInstructionsCard(),
-                const SizedBox(height: 12),
-                _buildCertificateTextField(
-                  fieldKey: 'payment_reference',
-                  label: 'GCash Reference Number',
-                  hint: 'Enter the payment reference number',
-                ),
-                const SizedBox(height: 10),
-                _buildPaymentProofUploader(),
-              ],
-              const SizedBox(height: 8),
+              const Text(
+                  "No online payment. Staff will confirm applicable fees. Pay and collect your document at the barangay office after the required checks."),
+              const SizedBox(height: 16),
               _buildReportSectionTitle("Additional Notes"),
               const SizedBox(height: 10),
               _buildCertificateTextField(
@@ -5034,168 +4905,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCertificatePaymentMethodSelector() {
-    final options = ["GCash", "Over-the-Counter"];
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: options.map((option) {
-        final isSelected = _selectedCertificatePaymentMethod == option;
-        return AppTapSurface(
-          selected: isSelected,
-          borderRadius: BorderRadius.circular(999),
-          onTap: () {
-            setState(() {
-              _selectedCertificatePaymentMethod = option;
-            });
-          },
-          child: AnimatedContainer(
-            duration: appMotionDuration(context, 160),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isSelected ? _brandBlue : Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: isSelected ? _brandBlue : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Text(
-              option,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFF475467),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildGcashPaymentInstructionsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            "GCash Payment Instructions",
-            style: TextStyle(
-              color: _brandBlue,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            "Send the payment to the GCash receiver below, then enter the reference number and upload a screenshot of your payment confirmation.",
-            style: TextStyle(
-              color: Color(0xFF475569),
-              fontSize: 13,
-              height: 1.45,
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            "Receiver Name: $_demoGcashReceiverName",
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            "GCash Number: $_demoGcashReceiverNumber",
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentProofUploader() {
-    final hasImage = _selectedPaymentProofImage != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Payment Proof Screenshot",
-          style: TextStyle(
-            color: Color(0xFF334155),
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        AppTapSurface(
-          onTap: _pickPaymentProofImage,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              children: [
-                if (hasImage)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      _selectedPaymentProofImage!,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                else
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.receipt_long_outlined,
-                        size: 44,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Text(
-                  hasImage
-                      ? "Tap to replace payment proof"
-                      : "Tap to upload payment proof",
-                  style: const TextStyle(
-                    color: _brandBlue,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -5472,7 +5181,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  Widget _buildVerifiedResidentBadge() {
+  Widget _buildPhoneOwnershipBadge() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
@@ -5483,7 +5192,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SvgPicture.asset(
-            _verifiedShieldAsset,
+            _accountAccess?.phoneVerified == true
+                ? _verifiedShieldAsset
+                : 'lib/assets/menu_icons/profile_menu.svg',
             width: 10,
             height: 12,
             colorFilter: const ColorFilter.mode(
@@ -5492,8 +5203,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             ),
           ),
           const SizedBox(width: 5),
-          const Text(
-            "Verified resident",
+          Flexible(
+              child: Text(
+            _accountAccess == null
+                ? 'Verification not checked'
+                : _accountAccess!.phoneVerified
+                    ? 'Phone verified'
+                    : 'Phone not verified',
             style: TextStyle(
               color: _brandBlue,
               fontSize: 11,
@@ -5501,7 +5217,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               letterSpacing: 0.1,
               height: 1,
             ),
-          ),
+          )),
         ],
       ),
     );
@@ -5635,12 +5351,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         _ProfileFaqItem(
           question: "How do I request a document?",
           answer:
-              "Go to Services, tap Request Document, choose the certificate you need, and submit the request form.",
+              "Choose a document in Services, complete the form, and arrange the required evidence. Staff review your application. Payment and collection take place at the barangay office.",
         ),
         _ProfileFaqItem(
-          question: "Why is my account marked verified?",
+          question: "What do phone and document checks mean?",
           answer:
-              "Verified Resident means your account information has been validated by the barangay records team.",
+              "Phone verification checks control of your number through SMS when available. Staff check identity, residency and representative authority within document applications. An active account does not automatically approve a document.",
         ),
       ],
     );
@@ -5658,17 +5374,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         _buildProfileSheetInfoRow(
           icon: Icons.call_outlined,
           title: "Contact Number",
-          subtitle: "+63 917 123 4567",
+          subtitle: "Ask the barangay office for its current contact number.",
         ),
         _buildProfileSheetInfoRow(
           icon: Icons.schedule_outlined,
           title: "Office Hours",
-          subtitle: "Monday to Friday, 8:00 AM to 5:00 PM",
+          subtitle: "Confirm current office hours with the barangay office.",
         ),
         _buildProfileSheetInfoRow(
           icon: Icons.mail_outline_rounded,
           title: "Email",
-          subtitle: "barangay.bancaobancao@example.com",
+          subtitle: "Ask the barangay office for its official email address.",
         ),
       ],
     );
@@ -5680,96 +5396,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       MaterialPageRoute(
         builder: (_) => const _BarangayTermsOfServiceScreen(),
       ),
-    );
-  }
-
-  Future<void> _showNotificationPreferencesSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
-          ? AnimationStyle.noAnimation
-          : const AnimationStyle(
-              duration: Duration(milliseconds: 240),
-              reverseDuration: Duration(milliseconds: 180)),
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            void updatePreference(void Function() update) {
-              setState(update);
-              setSheetState(() {});
-            }
-
-            return SafeArea(
-              child: Container(
-                margin: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 14, 8, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              "Notification Preferences",
-                              style: TextStyle(
-                                color: Color(0xFF004687),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(sheetContext),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SwitchListTile(
-                      value: _notifyAnnouncements,
-                      activeThumbColor: _brandBlue,
-                      title: const Text("Barangay announcements"),
-                      subtitle:
-                          const Text("Get notified about public updates."),
-                      onChanged: (value) => updatePreference(
-                        () => _notifyAnnouncements = value,
-                      ),
-                    ),
-                    SwitchListTile(
-                      value: _notifyReportUpdates,
-                      activeThumbColor: _brandBlue,
-                      title: const Text("Report updates"),
-                      subtitle:
-                          const Text("Receive status changes for reports."),
-                      onChanged: (value) => updatePreference(
-                        () => _notifyReportUpdates = value,
-                      ),
-                    ),
-                    SwitchListTile(
-                      value: _notifyDocumentUpdates,
-                      activeThumbColor: _brandBlue,
-                      title: const Text("Document requests"),
-                      subtitle:
-                          const Text("Receive certificate request updates."),
-                      onChanged: (value) => updatePreference(
-                        () => _notifyDocumentUpdates = value,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -5824,7 +5450,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                         letterSpacing: -0.4,
                         height: 1.25)),
                 const SizedBox(height: 10),
-                _buildVerifiedResidentBadge(),
+                _buildPhoneOwnershipBadge(),
               ])),
           const SizedBox(height: 26),
           const Text(
@@ -5893,12 +5519,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                   icon: Icons.shield_outlined,
                   title: "Privacy & Security",
                   onTap: _openPrivacySecurity,
-                ),
-                const Divider(height: 1, color: Color(0xFFF3F6F9)),
-                _buildProfileTile(
-                  icon: Icons.notifications_none_rounded,
-                  title: "Notification Preferences",
-                  onTap: _showNotificationPreferencesSheet,
                 ),
                 const Divider(height: 1, color: Color(0xFFF3F6F9)),
                 _buildProfileTile(

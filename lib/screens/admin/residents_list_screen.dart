@@ -5,6 +5,7 @@ import '../../widgets/top_toast.dart';
 import '../../widgets/app_status_message.dart';
 import 'add_resident_screen.dart';
 import '../../services/private_file_service.dart';
+import '../../services/basic_account_service.dart';
 
 class ResidentsListScreen extends StatefulWidget {
   const ResidentsListScreen({super.key});
@@ -74,6 +75,17 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
       final resolved = await PrivateFileService.resolveRecords(
         List<Map<String, dynamic>>.from(data),
       );
+      if (BasicAccountService.previewEnabled) {
+        final accounts =
+            await supabase.rpc('get_office_resident_accounts') as List;
+        final byUser = {
+          for (final account in accounts) account['user_id']: account
+        };
+        for (final resident in resolved) {
+          resident['basic_account'] =
+              byUser[resident['user_id'] ?? resident['id']];
+        }
+      }
 
       if (!mounted) return;
 
@@ -123,8 +135,6 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
     try {
       await supabase.from('residents').update({
         'status': newStatus,
-        'approved_by': supabase.auth.currentUser?.id,
-        'approved_at': DateTime.now().toIso8601String(),
       }).eq('id', id);
 
       if (!mounted) return;
@@ -146,11 +156,17 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
     Color color;
 
     switch (status) {
+      case 'active':
+      case 'phone verified':
       case 'approved':
         color = Colors.green;
         break;
+      case 'suspended':
       case 'rejected':
         color = Colors.red;
+        break;
+      case 'phone unverified':
+        color = Colors.blueGrey;
         break;
       default:
         color = Colors.orange;
@@ -213,7 +229,12 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
                       itemCount: residents.length,
                       itemBuilder: (context, index) {
                         final resident = residents[index];
-                        final status = resident['status'] ?? 'pending';
+                        final account = resident['basic_account'];
+                        final status = account != null
+                            ? (account['account_state'] == 'active'
+                                ? 'active'
+                                : 'suspended')
+                            : resident['status'] ?? 'pending';
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
@@ -233,10 +254,17 @@ class _ResidentsListScreenState extends State<ResidentsListScreen> {
                                 Text(
                                     "Contact: ${resident['contact_number'] ?? ''}"),
                                 const SizedBox(height: 6),
-                                buildStatusBadge(status),
+                                Wrap(spacing: 6, runSpacing: 6, children: [
+                                  buildStatusBadge(status),
+                                  if (account != null)
+                                    buildStatusBadge(
+                                        account['phone_verified'] == true
+                                            ? 'phone verified'
+                                            : 'phone unverified'),
+                                ]),
                               ],
                             ),
-                            trailing: userRole != 'admin'
+                            trailing: userRole != 'admin' || account != null
                                 ? null
                                 : PopupMenuButton<String>(
                                     tooltip: 'Resident actions',

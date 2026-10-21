@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
+import 'basic_account_service.dart';
 
 class AuthMessageException implements Exception {
   final String message;
@@ -18,7 +19,7 @@ class AuthService {
   /* ---------------- LOGIN ---------------- */
 
   static const String missingProfileMessage =
-      "Your account is approved, but your profile setup is not complete yet. Please contact the barangay admin.";
+      "Your profile setup is not complete yet. Please contact the barangay office.";
 
   Future<String?> login({
     required String email,
@@ -38,7 +39,7 @@ class AuthService {
     // First, check if user is an admin in the profiles table
     final profile = await _client
         .from('profiles')
-        .select('role, full_name')
+        .select('role, full_name, status')
         .eq('id', userId)
         .maybeSingle();
 
@@ -46,7 +47,16 @@ class AuthService {
     final profileRole =
         (profile?['role'] as String?)?.trim().toLowerCase() ?? '';
     if (profileRole == 'admin') {
+      if (profile?['status'] != 'approved') {
+        await _client.auth.signOut();
+        throw AuthMessageException('This office account is not active.');
+      }
       return 'admin';
+    }
+
+    if (BasicAccountService.previewEnabled) {
+      final access = await validateBasicAccount();
+      if (access != null) return 'resident';
     }
 
     // For non-admin users, check the residents table for approval status
@@ -92,8 +102,7 @@ class AuthService {
 
     if (status == 'rejected') {
       await _client.auth.signOut();
-      final rejectionReason =
-          (resident['rejection_reason'] as String?)?.trim();
+      final rejectionReason = (resident['rejection_reason'] as String?)?.trim();
       final reasonMessage = rejectionReason == null || rejectionReason.isEmpty
           ? "No reason was provided."
           : rejectionReason;
@@ -133,6 +142,26 @@ class AuthService {
     }
 
     return role;
+  }
+
+  /// Recheck on session restoration as well as password login.
+  Future<BasicAccountAccess?> validateBasicAccount() async {
+    if (!BasicAccountService.previewEnabled) return null;
+    final user = _client.auth.currentUser;
+    if (user == null) throw AuthMessageException('Please sign in to continue.');
+    final service = BasicAccountService();
+    await service.resumeRegistration(user);
+    final access = await service.access();
+    if (access == null) {
+      return null; // Legacy accounts keep their existing workflow.
+    }
+    if (!access.active || !access.basicAccess) {
+      await _client.auth.signOut();
+      throw AuthMessageException(!access.active
+          ? 'This account is suspended. Contact the barangay office.'
+          : 'Phone verification is required. SMS is not connected yet; test access must be enabled by the developer.');
+    }
+    return access;
   }
 
   Future<bool> _createResidentRecordFromProfile({
