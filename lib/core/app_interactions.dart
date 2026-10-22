@@ -42,3 +42,13 @@ class AppPageTransitionsBuilder extends PageTransitionsBuilder {
     );
   }
 }
+
+/// Shared one-shot motion; no controllers or timers remain running at rest.
+AnimationStyle appMotionStyle(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : const AnimationStyle(
+            duration: Duration(milliseconds: 180),
+            reverseDuration: Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic);

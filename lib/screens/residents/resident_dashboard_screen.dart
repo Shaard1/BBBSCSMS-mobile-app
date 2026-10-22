@@ -1,3 +1,5 @@
+import '../../widgets/document_office_summary.dart';
+import '../../services/document_application_validation.dart';
 import '../../widgets/document_submitted_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -665,6 +667,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
   Future<void> _logout() async {
     final shouldLogout = await showDialog<bool>(
+      animationStyle: appMotionStyle(context),
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -915,6 +918,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     final point = LatLng(latitude, longitude);
 
     await showDialog<void>(
+      animationStyle: appMotionStyle(context),
       context: context,
       builder: (dialogContext) {
         return Dialog(
@@ -2061,6 +2065,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     final controller = PageController(initialPage: initialIndex);
 
     showDialog<void>(
+      animationStyle: appMotionStyle(context),
       context: context,
       barrierColor: Colors.black,
       builder: (dialogContext) {
@@ -2389,6 +2394,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   bool _validateCertificateRequest() {
+    final validationError = DocumentApplicationValidation.validate(
+        birthdate: _certificateControllers['date_of_birth']!.text,
+        civilStatus: _certificateControllers['civil_status']!.text);
+    if (validationError != null) {
+      _showSnackBar(validationError);
+      return false;
+    }
     final requiredLabels = <String, String>{
       'full_name': 'Full Name',
       'address': 'Address',
@@ -2555,6 +2567,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     String certificateTitle,
   ) async {
     await showDialog<void>(
+      animationStyle: appMotionStyle(context),
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -3891,8 +3904,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     final purpose = request['purpose']?.toString().trim() ?? '';
     final additionalNotes =
         request['additional_notes']?.toString().trim() ?? '';
-    final rejectionReason =
-        request['rejection_reason']?.toString().trim() ?? '';
     final createdAt = request['created_at']?.toString();
     final rawFormData = request['form_data'];
     final formData = rawFormData is Map
@@ -4002,7 +4013,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                       if (paymentMethod.isNotEmpty)
                         _buildReportDetailsMetaChip(
                           icon: Icons.payments_outlined,
-                          label: paymentMethod,
+                          label: paymentMethod == 'office'
+                              ? 'At barangay office'
+                              : paymentMethod,
                         ),
                       if (feeLabel.isNotEmpty)
                         _buildReportDetailsMetaChip(
@@ -4012,18 +4025,14 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 22),
-                  if (request['workflow_version'] == 2) ...[
-                    _buildDocumentDetailSection(
-                        title: 'Office verification and collection',
-                        body:
-                            'Identity: ${request['identity_checked'] == true ? 'Checked' : 'Awaiting staff check'}\nResidency: ${request['residency_checked'] == true ? 'Checked' : 'Awaiting staff check'}\n${request['requester_capacity'] == 'representative' ? 'Representative authorization: ${request['authorization_checked'] == true ? 'Checked' : 'Awaiting staff check'}\n' : ''}Payment: ${request['office_payment_status'] ?? 'pending'} at the barangay office. Bring originals for any in-person checks. Collect the document at the office after approval.'),
-                    const SizedBox(height: 18),
-                  ],
+                  DocumentOfficeSummary(request: request),
+                  const SizedBox(height: 18),
                   _buildDocumentDetailSection(
                     title: "Purpose of Request",
                     body: purpose.isEmpty ? "No purpose provided." : purpose,
                   ),
-                  if (paymentMethod.isNotEmpty) ...[
+                  if (request['workflow_version'] != 2 &&
+                      paymentMethod.isNotEmpty) ...[
                     const SizedBox(height: 18),
                     _buildDocumentFieldRow(
                       label: "Payment Method",
@@ -4062,37 +4071,30 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                       body: additionalNotes,
                     ),
                   ],
-                  if (rejectionReason.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    _buildDocumentDetailSection(
-                      title: "Rejection Reason",
-                      body: rejectionReason,
-                      backgroundColor: const Color(0xFFFFF1F2),
-                      borderColor: const Color(0xFFFECDD3),
-                    ),
-                  ],
                   if (formData.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    const Text(
-                      "Submitted Information",
-                      style: TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ...formData.entries.map((entry) {
-                      final value = entry.value?.toString().trim() ?? '';
-                      if (value.isEmpty) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildDocumentFieldRow(
-                          label: _humanizeRequestFieldLabel(entry.key),
-                          value: value,
-                        ),
-                      );
-                    }),
+                    ExpansionTile(
+                        expansionAnimationStyle: appMotionStyle(context),
+                        tilePadding: EdgeInsets.zero,
+                        title: const Text('Application details'),
+                        children: [
+                          ...formData.entries.map((entry) {
+                            final value = entry.value?.toString().trim() ?? '';
+                            if (value.isEmpty ||
+                                (entry.key == 'purpose' && value == purpose) ||
+                                (entry.key == 'additional_notes' &&
+                                    value == additionalNotes)) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _buildDocumentFieldRow(
+                                label: _humanizeRequestFieldLabel(entry.key),
+                                value: value,
+                              ),
+                            );
+                          }),
+                        ]),
                   ],
                   const SizedBox(height: 8),
                   _buildDocumentFieldRow(
@@ -4866,6 +4868,25 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
   }) {
+    if (fieldKey == 'civil_status') {
+      final controller = _certificateControllers[fieldKey]!;
+      final match = DocumentApplicationValidation.civilStatuses
+          .where((v) => v.toLowerCase() == controller.text.trim().toLowerCase())
+          .firstOrNull;
+      return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DropdownButtonFormField<String>(
+              key: ValueKey('civil-status-${controller.text}'),
+              initialValue: match,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: label),
+              items: DocumentApplicationValidation.civilStatuses
+                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => controller.text = value);
+              }));
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -4882,6 +4903,28 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _certificateControllers[fieldKey],
+            readOnly: fieldKey == 'date_of_birth',
+            onTap: fieldKey == 'date_of_birth'
+                ? () async {
+                    final now = DateTime.now();
+                    final existing = DateTime.tryParse(
+                        _certificateControllers[fieldKey]!.text);
+                    final today = DateTime(now.year, now.month, now.day);
+                    final chosen = await showDatePicker(
+                        context: context,
+                        initialDate: existing != null &&
+                                existing.year >= 1900 &&
+                                !existing.isAfter(today)
+                            ? existing
+                            : today,
+                        firstDate: DateTime(1900),
+                        lastDate: today);
+                    if (chosen != null && mounted) {
+                      setState(() => _certificateControllers[fieldKey]!.text =
+                          chosen.toIso8601String().substring(0, 10));
+                    }
+                  }
+                : null,
             keyboardType: keyboardType,
             maxLines: maxLines,
             decoration: InputDecoration(
@@ -5897,6 +5940,7 @@ class _ProfileFaqItem extends StatelessWidget {
         border: Border.all(color: const Color(0xFFEEEEEE)),
       ),
       child: ExpansionTile(
+        expansionAnimationStyle: appMotionStyle(context),
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         iconColor: const Color(0xFF0B4F94),

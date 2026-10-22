@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../core/app_interactions.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -134,7 +135,9 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
               children: options.entries
                   .map((option) => Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: DecoratedBox(
+                      child: AnimatedContainer(
+                        duration: appMotionDuration(context, 140),
+                        curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
                             color: option.key == selected
                                 ? const Color(0xFFEFF6FF)

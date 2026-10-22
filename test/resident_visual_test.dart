@@ -133,6 +133,14 @@ void main() {
             data = [
               {
                 'id': 'document-1',
+                'workflow_version': 2,
+                'requester_capacity': 'self',
+                'office_payment_status': 'pending',
+                'form_data': {
+                  'purpose': 'Employment',
+                  'civil_status': 'Single',
+                  'date_of_birth': '2000-01-01'
+                },
                 'certificate_title': 'Barangay Clearance',
                 'status': 'pending',
                 'created_at': '2026-09-20T08:00:00Z',
@@ -265,6 +273,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Report Details'), findsNothing);
       expect(find.text('Document Request Details'), findsOneWidget);
+      expect(find.text('Employment'), findsOneWidget);
+      await captureUi(tester, 'document-owner-details-$scale');
       expect(tester.takeException(), isNull);
       await tester.tap(find.byIcon(Icons.arrow_back).first);
       await tester.pumpAndSettle();

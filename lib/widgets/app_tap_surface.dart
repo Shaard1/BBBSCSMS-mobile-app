@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../core/app_interactions.dart';
 
 /// Paint feedback above decorated cards and photos, where an ancestor's ink
 /// would otherwise be hidden. InkWell supplies keyboard and focus support.
-class AppTapSurface extends StatelessWidget {
+class AppTapSurface extends StatefulWidget {
   const AppTapSurface({
     super.key,
     required this.child,
@@ -19,25 +20,41 @@ class AppTapSurface extends StatelessWidget {
   final BorderRadius borderRadius;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: onTap != null,
-        onTap: onTap,
-        label: label,
-        selected: selected,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            child,
+  State<AppTapSurface> createState() => _AppTapSurfaceState();
+}
+
+class _AppTapSurfaceState extends State<AppTapSurface> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) => AnimatedScale(
+        scale: _pressed &&
+                widget.onTap != null &&
+                !MediaQuery.disableAnimationsOf(context)
+            ? 0.988
+            : 1,
+        duration: appMotionDuration(context, 100),
+        curve: Curves.easeOutCubic,
+        child: Semantics(
+          button: widget.onTap != null,
+          onTap: widget.onTap,
+          label: widget.label,
+          selected: widget.selected,
+          child: Stack(clipBehavior: Clip.none, children: [
+            widget.child,
             Positioned.fill(
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                    borderRadius: borderRadius,
-                    onTap: onTap,
-                    excludeFromSemantics: true),
-              ),
-            ),
-          ],
+                child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      borderRadius: widget.borderRadius,
+                      onTap: widget.onTap,
+                      excludeFromSemantics: true,
+                      onHighlightChanged: (value) {
+                        if (mounted && _pressed != value) {
+                          setState(() => _pressed = value);
+                        }
+                      },
+                    ))),
+          ]),
         ),
       );
 }

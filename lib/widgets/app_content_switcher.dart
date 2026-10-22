@@ -14,7 +14,9 @@ class AppContentSwitcher extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             for (final outgoing in previous)
-              ExcludeSemantics(child: IgnorePointer(child: outgoing)),
+              ExcludeSemantics(
+                  child: IgnorePointer(
+                      child: TickerMode(enabled: false, child: outgoing))),
             if (current != null) current,
           ],
         ),
