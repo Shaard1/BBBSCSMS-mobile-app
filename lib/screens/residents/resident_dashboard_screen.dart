@@ -851,27 +851,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  String _formatDetailedReportDate(String? rawValue) {
-    final parsed = rawValue == null ? null : DateTime.tryParse(rawValue);
-    if (parsed == null) return "Unknown date";
-    final local = parsed.toLocal();
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${monthNames[local.month - 1]} ${local.day}, ${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}";
-  }
-
   List<String> _extractReportImages(Map<String, dynamic> report) {
     final urls = <String>[];
 
@@ -3912,40 +3891,14 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+          toolbarHeight:
+              MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 112 : 64,
+          title: const Text("Document Request Details", maxLines: 2)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: Color(0xFF0B4F94),
-                    size: 18,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    "Document Request Details",
-                    style: TextStyle(
-                      color: Color(0xFF0B4F94),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -3995,7 +3948,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildResidentStatusChip(statusLabel),
+                            _buildResidentStatusChip(status == 'pending'
+                                ? 'Waiting for review'
+                                : statusLabel),
                           ],
                         ),
                       ),
@@ -4006,15 +3961,16 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildReportDetailsMetaChip(
-                        icon: Icons.schedule_outlined,
-                        label: _formatDetailedReportDate(createdAt),
-                      ),
+                      Text('Submitted ${formatDocumentDate(createdAt)}',
+                          style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.4,
+                              color: Color(0xFF526274))),
                       if (paymentMethod.isNotEmpty)
                         _buildReportDetailsMetaChip(
                           icon: Icons.payments_outlined,
                           label: paymentMethod == 'office'
-                              ? 'At barangay office'
+                              ? 'Office collection'
                               : paymentMethod,
                         ),
                       if (feeLabel.isNotEmpty)
@@ -4024,89 +3980,59 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                         ),
                     ],
                   ),
+                  DocumentLastUpdated(request: request),
                   const SizedBox(height: 22),
                   DocumentOfficeSummary(request: request),
                   const SizedBox(height: 18),
-                  _buildDocumentDetailSection(
-                    title: "Purpose of Request",
-                    body: purpose.isEmpty ? "No purpose provided." : purpose,
-                  ),
-                  if (request['workflow_version'] != 2 &&
-                      paymentMethod.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    _buildDocumentFieldRow(
-                      label: "Payment Method",
-                      value: paymentMethod,
-                    ),
-                  ],
-                  if (paymentReceiverName.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _buildDocumentFieldRow(
-                      label: "Receiver Name",
-                      value: paymentReceiverName,
-                    ),
-                  ],
-                  if (paymentReceiverNumber.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _buildDocumentFieldRow(
-                      label: "Receiver Number",
-                      value: paymentReceiverNumber,
-                    ),
-                  ],
-                  if (paymentReference.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _buildDocumentFieldRow(
-                      label: "Payment Reference",
-                      value: paymentReference,
-                    ),
-                  ],
-                  if (paymentProofUrl.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    _buildDocumentPaymentProofCard(paymentProofUrl),
-                  ],
-                  if (additionalNotes.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    _buildDocumentDetailSection(
-                      title: "Additional Notes",
-                      body: additionalNotes,
-                    ),
-                  ],
-                  if (formData.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    ExpansionTile(
-                        expansionAnimationStyle: appMotionStyle(context),
-                        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                        expandedAlignment: Alignment.centerLeft,
-                        shape: const Border(
-                            bottom: BorderSide(color: Color(0xFFE7EEF5))),
-                        collapsedShape: const Border(
-                            bottom: BorderSide(color: Color(0xFFE7EEF5))),
-                        tilePadding: EdgeInsets.zero,
-                        title: const Text('Application details'),
-                        children: [
-                          ...formData.entries.map((entry) {
-                            final value = entry.value?.toString().trim() ?? '';
-                            if (value.isEmpty ||
-                                (entry.key == 'purpose' && value == purpose) ||
-                                (entry.key == 'additional_notes' &&
-                                    value == additionalNotes)) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _buildDocumentFieldRow(
-                                label: _humanizeRequestFieldLabel(entry.key),
-                                value: value,
-                              ),
-                            );
-                          }),
-                        ]),
-                  ],
-                  const SizedBox(height: 8),
-                  _buildDocumentFieldRow(
-                    label: "Request ID",
-                    value: request['id']?.toString() ?? 'Unavailable',
-                  ),
+                  DocumentDetailSection(
+                      title: 'Application details',
+                      summary: 'Your submitted information',
+                      children: [
+                        _buildDocumentFieldRow(
+                            label: 'Purpose of request',
+                            value: purpose.isEmpty ? 'Not provided' : purpose),
+                        if (additionalNotes.isNotEmpty)
+                          _buildDocumentFieldRow(
+                              label: 'Additional notes',
+                              value: additionalNotes),
+                        if (request['workflow_version'] != 2 &&
+                            paymentMethod.isNotEmpty)
+                          _buildDocumentFieldRow(
+                              label: 'Payment method (previous record)',
+                              value: paymentMethod),
+                        if (paymentReceiverName.isNotEmpty)
+                          _buildDocumentFieldRow(
+                              label: 'Receiver name',
+                              value: paymentReceiverName),
+                        if (paymentReceiverNumber.isNotEmpty)
+                          _buildDocumentFieldRow(
+                              label: 'Receiver number',
+                              value: paymentReceiverNumber),
+                        if (paymentReference.isNotEmpty)
+                          _buildDocumentFieldRow(
+                              label: 'Payment reference',
+                              value: paymentReference),
+                        if (paymentProofUrl.isNotEmpty)
+                          _buildDocumentPaymentProofCard(paymentProofUrl),
+                        ...formData.entries
+                            .where((entry) =>
+                                entry.value != null &&
+                                entry.value.toString().trim().isNotEmpty &&
+                                !(entry.key == 'purpose' &&
+                                    entry.value.toString().trim() == purpose) &&
+                                !(entry.key == 'additional_notes' &&
+                                    entry.value.toString().trim() ==
+                                        additionalNotes))
+                            .map((entry) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _buildDocumentFieldRow(
+                                    label:
+                                        _humanizeRequestFieldLabel(entry.key),
+                                    value: entry.value.toString()))),
+                        _buildDocumentFieldRow(
+                            label: 'Request ID',
+                            value: request['id']?.toString() ?? 'Unavailable'),
+                      ]),
                 ],
               ),
             ),
@@ -4129,89 +4055,29 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         statusLabel.toUpperCase(),
         style: TextStyle(
           color: statusStyle.text,
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
 
-  Widget _buildDocumentDetailSection({
-    required String title,
-    required String body,
-    Color backgroundColor = const Color(0xFFF8FAFC),
-    Color borderColor = const Color(0xFFE2E8F0),
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: const TextStyle(
-              color: Color(0xFF475569),
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocumentFieldRow({
-    required String label,
-    required String value,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+  Widget _buildDocumentFieldRow(
+          {required String label, required String value}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(
+                  color: Color(0xFF526274),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF1F2937),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+          Text(value,
+              style: const TextStyle(
+                  color: Color(0xFF253449), fontSize: 16, height: 1.45)),
+        ]),
+      );
 
   Widget _buildDocumentPaymentProofCard(String imageUrl) {
     return AppTapSurface(

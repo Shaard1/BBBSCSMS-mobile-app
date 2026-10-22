@@ -273,8 +273,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Report Details'), findsNothing);
       expect(find.text('Document Request Details'), findsOneWidget);
-      expect(find.text('Employment'), findsOneWidget);
+      expect(find.text('Employment'), findsNothing);
       await captureUi(tester, 'document-owner-details-$scale');
+      await tester.scrollUntilVisible(find.text('Application details'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Application details'));
+      await tester.pumpAndSettle();
+      expect(find.text('Employment'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byIcon(Icons.arrow_back).first);
       await tester.pumpAndSettle();

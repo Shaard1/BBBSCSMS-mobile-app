@@ -48,15 +48,12 @@ void main() {
                   'identity_evidence_method': 'upload',
                   'residency_evidence_method': 'in_person'
                 }))))));
-    await tester.tap(find.text('Staff document review'));
+    await tester.tap(find.text('Document checks'));
     await tester.pumpAndSettle();
     expect(find.text('ID check'), findsOneWidget);
     expect(find.text('Address check'), findsOneWidget);
     expect(find.text('Waiting for staff review'), findsNWidgets(2));
-    expect(
-        find.text('Your photo was submitted. Staff still need to review it.'),
-        findsOneWidget);
-    expect(find.textContaining('Contact the barangay office about when'),
+    expect(find.textContaining('Contact the barangay office to confirm when'),
         findsOneWidget);
     await captureUi(tester, 'document-staff-review-clear');
     expect(tester.takeException(), isNull);
@@ -93,11 +90,10 @@ void main() {
         expect(find.text('Reason for rejection'), findsOneWidget);
       }
       await captureUi(tester, 'document-owner-$status');
-      await tester.tap(find.text('Office payment and collection'));
+      await tester.tap(find.text('Collection details'));
       await tester.pumpAndSettle();
       expect(find.text('No fee required'), findsOneWidget);
-      final titleX =
-          tester.getTopLeft(find.text('Office payment and collection')).dx;
+      final titleX = tester.getTopLeft(find.text('Collection details')).dx;
       for (final label in [
         'Payment decision',
         'No fee required',
@@ -108,7 +104,7 @@ void main() {
         expect(tester.getTopLeft(find.text(label)).dx, closeTo(titleX, 1));
       }
       final tile = tester.widget<ExpansionTile>(find.ancestor(
-          of: find.text('Office payment and collection'),
+          of: find.text('Collection details'),
           matching: find.byType(ExpansionTile)));
       expect(tile.shape, tile.collapsedShape);
       expect((tile.shape! as Border).bottom.color, const Color(0xFFE7EEF5));
