@@ -32,6 +32,35 @@ void main() {
             birthdate: '', civilStatus: 'asdasd'),
         isNotNull);
   });
+  testWidgets('review cards explain staff checks and an in-person next step',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(testApp(const Scaffold(
+        body: SingleChildScrollView(
+            child: Padding(
+                padding: EdgeInsets.all(20),
+                child: DocumentOfficeSummary(request: {
+                  'workflow_version': 2,
+                  'status': 'pending',
+                  'identity_evidence_method': 'upload',
+                  'residency_evidence_method': 'in_person'
+                }))))));
+    await tester.tap(find.text('Staff document review'));
+    await tester.pumpAndSettle();
+    expect(find.text('ID check'), findsOneWidget);
+    expect(find.text('Address check'), findsOneWidget);
+    expect(find.text('Waiting for staff review'), findsNWidgets(2));
+    expect(
+        find.text('Your photo was submitted. Staff still need to review it.'),
+        findsOneWidget);
+    expect(find.textContaining('Contact the barangay office about when'),
+        findsOneWidget);
+    await captureUi(tester, 'document-staff-review-clear');
+    expect(tester.takeException(), isNull);
+  });
   for (final status in ['rejected', 'completed']) {
     testWidgets(
         '$status has appropriate guidance and conditional owner details',
@@ -67,6 +96,23 @@ void main() {
       await tester.tap(find.text('Office payment and collection'));
       await tester.pumpAndSettle();
       expect(find.text('No fee required'), findsOneWidget);
+      final titleX =
+          tester.getTopLeft(find.text('Office payment and collection')).dx;
+      for (final label in [
+        'Payment decision',
+        'No fee required',
+        'No-fee reason',
+        'Physical collection',
+        'Not confirmed'
+      ]) {
+        expect(tester.getTopLeft(find.text(label)).dx, closeTo(titleX, 1));
+      }
+      final tile = tester.widget<ExpansionTile>(find.ancestor(
+          of: find.text('Office payment and collection'),
+          matching: find.byType(ExpansionTile)));
+      expect(tile.shape, tile.collapsedShape);
+      expect((tile.shape! as Border).bottom.color, const Color(0xFFE7EEF5));
+      await captureUi(tester, 'document-owner-aligned-$status');
       expect(find.text('STALE RECEIPT'), findsNothing);
       expect(find.text('STALE NAME'), findsNothing);
       expect(find.text('Not confirmed'), findsOneWidget);

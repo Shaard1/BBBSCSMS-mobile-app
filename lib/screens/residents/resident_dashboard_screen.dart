@@ -4075,6 +4075,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     const SizedBox(height: 18),
                     ExpansionTile(
                         expansionAnimationStyle: appMotionStyle(context),
+                        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                        expandedAlignment: Alignment.centerLeft,
+                        shape: const Border(
+                            bottom: BorderSide(color: Color(0xFFE7EEF5))),
+                        collapsedShape: const Border(
+                            bottom: BorderSide(color: Color(0xFFE7EEF5))),
                         tilePadding: EdgeInsets.zero,
                         title: const Text('Application details'),
                         children: [

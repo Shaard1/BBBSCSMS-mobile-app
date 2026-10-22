@@ -26,6 +26,62 @@ class DocumentOfficeSummary extends StatelessWidget {
         const SizedBox(height: 4),
         Text(text)
       ]));
+  Widget _checkCard(String kind, String title, IconData icon) {
+    final checked = request['${kind}_checked'] == true;
+    final closed = ['rejected', 'completed'].contains(status);
+    final method = value('${kind}_evidence_method');
+    final explanation = checked
+        ? 'Staff have completed this check.'
+        : closed
+            ? 'This check was not completed before the request closed.'
+            : method == 'in_person'
+                ? 'You chose to show original documents at the barangay office.'
+                : method == 'upload'
+                    ? 'Your photo was submitted. Staff still need to review it.'
+                    : 'Staff still need to review the supporting documents.';
+    return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE1E8F0)),
+            borderRadius: BorderRadius.circular(12)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: const Color(0xFF0B4F94), size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Icon(checked ? Icons.check_circle_outline : Icons.schedule,
+                      size: 16,
+                      color: checked
+                          ? const Color(0xFF237547)
+                          : const Color(0xFF64748B)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                      child: Text(
+                          checked
+                              ? 'Checked by staff'
+                              : closed
+                                  ? 'Not completed'
+                                  : 'Waiting for staff review',
+                          style: TextStyle(
+                              color: checked
+                                  ? const Color(0xFF237547)
+                                  : const Color(0xFF526274))))
+                ]),
+                const SizedBox(height: 8),
+                Text(explanation,
+                    style:
+                        const TextStyle(color: Color(0xFF526274), height: 1.4)),
+              ])),
+        ]));
+  }
+
   @override
   Widget build(BuildContext context) {
     final payment = value('office_payment_status');
@@ -56,32 +112,48 @@ class DocumentOfficeSummary extends StatelessWidget {
         const SizedBox(height: 16),
         ExpansionTile(
             expansionAnimationStyle: appMotionStyle(context),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            expandedAlignment: Alignment.centerLeft,
+            shape: const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
+            collapsedShape:
+                const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.symmetric(vertical: 8),
-            title: const Text('Requirements and checks'),
+            title: const Text('Staff document review'),
+            subtitle: const Text('ID, address and permission checks'),
             children: [
-              row(
-                  'Identity',
-                  request['identity_checked'] == true
-                      ? 'Checked'
-                      : 'Awaiting staff check'),
-              row(
-                  'Residency',
-                  request['residency_checked'] == true
-                      ? 'Checked'
-                      : 'Awaiting staff check'),
+              const Padding(
+                  padding: EdgeInsets.only(bottom: 14),
+                  child: Text(
+                      'Barangay staff complete these checks for this document request.')),
+              _checkCard('identity', 'ID check', Icons.badge_outlined),
+              _checkCard('residency', 'Address check', Icons.home_outlined),
               if (value('requester_capacity') == 'representative')
-                row(
-                    'Representative permission',
-                    request['authorization_checked'] == true
-                        ? 'Checked'
-                        : 'Awaiting staff check'),
-              if (!['rejected', 'completed'].contains(status))
-                const Text(
-                    'An upload does not automatically verify identity. Staff may ask to inspect originals.'),
+                _checkCard(
+                    'authorization',
+                    'Permission to apply for someone else',
+                    Icons.assignment_ind_outlined),
+              if (!['rejected', 'completed'].contains(status) &&
+                  [
+                    'identity',
+                    'residency',
+                    if (value('requester_capacity') == 'representative')
+                      'authorization'
+                  ].any((kind) =>
+                      value('${kind}_evidence_method') == 'in_person' &&
+                      request['${kind}_checked'] != true))
+                const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                        'You chose to present originals in person. Contact the barangay office about when to bring them for checking.')),
             ]),
         ExpansionTile(
             expansionAnimationStyle: appMotionStyle(context),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            expandedAlignment: Alignment.centerLeft,
+            shape: const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
+            collapsedShape:
+                const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.symmetric(vertical: 8),
             title: const Text('Office payment and collection'),
@@ -123,6 +195,11 @@ class DocumentOfficeSummary extends StatelessWidget {
       ],
       ExpansionTile(
           expansionAnimationStyle: appMotionStyle(context),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          expandedAlignment: Alignment.centerLeft,
+          shape: const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
+          collapsedShape:
+              const Border(bottom: BorderSide(color: Color(0xFFE7EEF5))),
           tilePadding: EdgeInsets.zero,
           childrenPadding: const EdgeInsets.symmetric(vertical: 8),
           title: const Text('Recorded updates'),
@@ -130,8 +207,6 @@ class DocumentOfficeSummary extends StatelessWidget {
             row('Submitted', _date(value('created_at'))),
             if (value('updated_at').isNotEmpty)
               row('Latest update', _date(value('updated_at'))),
-            const Text(
-                'This shows the latest recorded update, not the full staff review history.'),
           ]),
     ]);
   }
@@ -140,6 +215,6 @@ class DocumentOfficeSummary extends StatelessWidget {
     final date = DateTime.tryParse(raw)?.toLocal();
     return date == null
         ? 'Not recorded'
-        : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${TimeOfDay.fromDateTime(date).hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour % 12 == 0 ? 12 : date.hour % 12}:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'AM' : 'PM'}';
   }
 }
