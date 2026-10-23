@@ -1,7 +1,10 @@
+import '../../widgets/form_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../widgets/top_toast.dart';
+import '../../services/basic_account_service.dart';
+import '../../services/document_application_validation.dart';
 
 class AddResidentScreen extends StatefulWidget {
   const AddResidentScreen({super.key});
@@ -10,7 +13,8 @@ class AddResidentScreen extends StatefulWidget {
   State<AddResidentScreen> createState() => _AddResidentScreenState();
 }
 
-class _AddResidentScreenState extends State<AddResidentScreen> {
+class _AddResidentScreenState extends State<AddResidentScreen>
+    with FormFeedback<AddResidentScreen> {
   final supabase = Supabase.instance.client;
 
   final fullNameController = TextEditingController();
@@ -29,12 +33,23 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
   /*--------------------- ADD RESIDENT -------------------------------*/
 
   Future<void> addResident() async {
-    // ✅ INPUT VALIDATION
-    if (fullNameController.text.trim().isEmpty ||
-        birthdateController.text.trim().isEmpty ||
-        addressController.text.trim().isEmpty ||
-        contactController.text.trim().isEmpty) {
-      _showTopToast('Please fill all fields');
+    if (isLoading) return;
+    if (!validateFields({
+      'resident_name': fullNameController.text.trim().isEmpty
+          ? 'Enter the resident’s full name.'
+          : null,
+      'resident_birthdate': birthdateController.text.trim().isEmpty
+          ? 'Choose a birthdate.'
+          : DocumentApplicationValidation.validate(
+              birthdate: birthdateController.text, civilStatus: ''),
+      'resident_address': addressController.text.trim().isEmpty
+          ? 'Enter the residential address.'
+          : null,
+      'resident_phone':
+          BasicAccountService.normalizePhone(contactController.text) == null
+              ? 'Enter a valid Philippine mobile number.'
+              : null,
+    })) {
       return;
     }
 
@@ -102,26 +117,38 @@ class _AddResidentScreenState extends State<AddResidentScreen> {
         child: Column(
           children: [
             TextField(
+              key: fieldAnchor('resident_name'),
+              focusNode: fieldFocus('resident_name', fullNameController),
               controller: fullNameController,
-              decoration: const InputDecoration(labelText: 'Full Name'),
+              decoration: decorateField('resident_name',
+                  const InputDecoration(labelText: 'Full Name')),
             ),
             const SizedBox(height: 12),
             TextField(
+              key: fieldAnchor('resident_birthdate'),
+              focusNode: fieldFocus('resident_birthdate', birthdateController),
               controller: birthdateController,
               readOnly: true,
               onTap: pickDate,
-              decoration: const InputDecoration(labelText: 'Birthdate'),
+              decoration: decorateField('resident_birthdate',
+                  const InputDecoration(labelText: 'Birthdate')),
             ),
             const SizedBox(height: 12),
             TextField(
+              key: fieldAnchor('resident_address'),
+              focusNode: fieldFocus('resident_address', addressController),
               controller: addressController,
-              decoration: const InputDecoration(labelText: 'Address'),
+              decoration: decorateField('resident_address',
+                  const InputDecoration(labelText: 'Address')),
             ),
             const SizedBox(height: 12),
             TextField(
+              key: fieldAnchor('resident_phone'),
+              focusNode: fieldFocus('resident_phone', contactController),
               controller: contactController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Contact Number'),
+              decoration: decorateField('resident_phone',
+                  const InputDecoration(labelText: 'Contact Number')),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(

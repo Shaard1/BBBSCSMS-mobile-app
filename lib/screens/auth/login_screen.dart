@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -12,7 +13,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, FormFeedback<LoginScreen> {
   static const _brandBlue = Color(0xFF0B4F94);
   static const _buttonBlue = Color(0xFF006CBF); // ***** Button color *****
   static const _linkBlue = Color(0xFF003E7E);
@@ -98,11 +99,14 @@ class _LoginScreenState extends State<LoginScreen>
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final validationMessage = _validateLoginInput(email, password);
-
-    if (validationMessage != null) {
-      setState(() => _errorMessage = validationMessage);
-      _triggerShake(email: _emailHasError, password: _passwordHasError);
+    if (!validateFields({
+      'login_email': email.isEmpty
+          ? 'Enter your email address.'
+          : !_isValidEmail(email)
+              ? 'Enter a valid email address.'
+              : null,
+      'login_password': password.isEmpty ? 'Enter your password.' : null,
+    })) {
       return;
     }
 
@@ -141,39 +145,6 @@ class _LoginScreenState extends State<LoginScreen>
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  String? _validateLoginInput(String email, String password) {
-    final isEmailEmpty = email.isEmpty;
-    final isPasswordEmpty = password.isEmpty;
-
-    if (isEmailEmpty && isPasswordEmpty) {
-      _emailHasError = true;
-      _passwordHasError = true;
-      return "Please enter your email and password.";
-    }
-
-    if (isEmailEmpty) {
-      _emailHasError = true;
-      _passwordHasError = false;
-      return "Please enter your email.";
-    }
-
-    if (isPasswordEmpty) {
-      _emailHasError = false;
-      _passwordHasError = true;
-      return "Please enter your password.";
-    }
-
-    if (!_isValidEmail(email)) {
-      _emailHasError = true;
-      _passwordHasError = false;
-      return "Please enter a valid email address.";
-    }
-
-    _emailHasError = false;
-    _passwordHasError = false;
-    return null;
   }
 
   bool _isValidEmail(String email) {
@@ -383,6 +354,9 @@ class _LoginScreenState extends State<LoginScreen>
                         constraints:
                             BoxConstraints(minHeight: inputFieldHeight),
                         child: TextField(
+                          key: fieldAnchor('login_email'),
+                          focusNode:
+                              fieldFocus('login_email', _emailController),
                           controller: _emailController,
                           autofillHints: const [
                             AutofillHints.username,
@@ -396,11 +370,13 @@ class _LoginScreenState extends State<LoginScreen>
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           onChanged: (_) => _clearErrorForInput(),
-                          decoration: _inputDecoration(
-                            hintText: 'Email',
-                            icon: Icons.mail_outline,
-                            hasError: _emailHasError,
-                          ),
+                          decoration: decorateField(
+                              'login_email',
+                              _inputDecoration(
+                                hintText: 'Email',
+                                icon: Icons.mail_outline,
+                                hasError: _emailHasError,
+                              )),
                         ),
                       ),
                     ),
@@ -413,6 +389,9 @@ class _LoginScreenState extends State<LoginScreen>
                         constraints:
                             BoxConstraints(minHeight: inputFieldHeight),
                         child: TextField(
+                          key: fieldAnchor('login_password'),
+                          focusNode:
+                              fieldFocus('login_password', _passwordController),
                           controller: _passwordController,
                           autofillHints: const [AutofillHints.password],
                           enableSuggestions: false,
@@ -426,30 +405,32 @@ class _LoginScreenState extends State<LoginScreen>
                           textInputAction: TextInputAction.done,
                           onChanged: (_) => _clearErrorForInput(),
                           onSubmitted: (_) => _login(),
-                          decoration: _inputDecoration(
-                            hintText: 'Password',
-                            icon: Icons.lock_outline,
-                            hasError: _passwordHasError,
-                            suffixIcon: IconButton(
-                              tooltip: _isPasswordVisible
-                                  ? 'Hide password'
-                                  : 'Show password',
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
-                                });
-                              },
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: _passwordHasError
-                                    ? _errorColor
-                                    : _fieldIconColor,
-                                size: 20,
-                              ),
-                            ),
-                          ),
+                          decoration: decorateField(
+                              'login_password',
+                              _inputDecoration(
+                                hintText: 'Password',
+                                icon: Icons.lock_outline,
+                                hasError: _passwordHasError,
+                                suffixIcon: IconButton(
+                                  tooltip: _isPasswordVisible
+                                      ? 'Hide password'
+                                      : 'Show password',
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: _passwordHasError
+                                        ? _errorColor
+                                        : _fieldIconColor,
+                                    size: 20,
+                                  ),
+                                ),
+                              )),
                         ),
                       ),
                     ),

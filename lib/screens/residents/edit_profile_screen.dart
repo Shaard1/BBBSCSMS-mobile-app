@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,8 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends State<EditProfileScreen>
+    with FormFeedback<EditProfileScreen> {
   static const Color _brandBlue = Color(0xFF0B4F94);
   static const Color _pageBackground = Color(0xFFF8FAFC);
 
@@ -157,13 +159,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final address = _addressController.text.trim();
     final contactNumber = _contactController.text.trim();
 
-    if (fullName.isEmpty || contactNumber.isEmpty) {
-      _showTopToast("Please fill in your name and contact number.");
-      return;
-    }
-
-    if (BasicAccountService.normalizePhone(contactNumber) == null) {
-      _showTopToast("Enter a valid Philippine mobile number.");
+    if (!validateFields({
+      'profile_name': fullName.isEmpty ? 'Enter your full name.' : null,
+      'profile_phone': BasicAccountService.normalizePhone(contactNumber) == null
+          ? 'Enter a valid Philippine mobile number.'
+          : null,
+    })) {
       return;
     }
 
@@ -407,6 +408,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      key: fieldAnchor('profile_name'),
+                      focusNode:
+                          fieldFocus('profile_name', _fullNameController),
                       controller: _fullNameController,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.name],
@@ -416,10 +420,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         fontSize: 16,
                         height: 1.35,
                       ),
-                      decoration: _fieldDecoration("Full name"),
+                      decoration: decorateField(
+                          'profile_name', _fieldDecoration("Full name")),
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      key: fieldAnchor('profile_address'),
+                      focusNode:
+                          fieldFocus('profile_address', _addressController),
                       controller: _addressController,
                       textCapitalization: TextCapitalization.words,
                       maxLines: 2,
@@ -428,10 +436,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         fontSize: 16,
                         height: 1.35,
                       ),
-                      decoration: _fieldDecoration("Address"),
+                      decoration: decorateField(
+                          'profile_address', _fieldDecoration("Address")),
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      key: fieldAnchor('profile_phone'),
+                      focusNode:
+                          fieldFocus('profile_phone', _contactController),
                       controller: _contactController,
                       textInputAction: TextInputAction.done,
                       autofillHints: const [
@@ -447,11 +459,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      decoration: _fieldDecoration("Contact number").copyWith(
-                        helperText:
-                            "Contact details do not verify or change your sign-in number.",
-                        helperMaxLines: 2,
-                      ),
+                      decoration: decorateField(
+                          'profile_phone',
+                          _fieldDecoration("Contact number").copyWith(
+                            helperText:
+                                "Contact details do not verify or change your sign-in number.",
+                            helperMaxLines: 2,
+                          )),
                     ),
                     const SizedBox(height: 18),
                     SizedBox(

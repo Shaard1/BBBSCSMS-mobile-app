@@ -67,8 +67,24 @@ void main() {
     await captureUi(tester, 'document-requirements-representative');
     await tester.tap(find.byKey(const ValueKey('continue-submission')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Choose the required image').hitTestable(),
+    expect(find.textContaining('Choose a photo, or select').hitTestable(),
         findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('multiple missing uploads return to the first missing section',
+      (tester) async {
+    await open(tester, size: const Size(320, 568), scale: 1.6);
+    await reveal(tester, 'identity-upload');
+    await tester.tap(find.byKey(const ValueKey('identity-upload')));
+    await tester.pumpAndSettle();
+    await reveal(tester, 'residency-upload');
+    await tester.tap(find.byKey(const ValueKey('residency-upload')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('continue-submission')));
+    await tester.pumpAndSettle();
+    expect(find.text('Proof of identity').hitTestable(), findsOneWidget);
+    expect(find.textContaining('Choose a photo, or select'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 

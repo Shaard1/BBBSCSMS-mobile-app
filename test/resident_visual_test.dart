@@ -180,6 +180,59 @@ void main() {
 
   tearDownAll(() => Supabase.instance.dispose());
 
+  for (final title in [
+    'Certificate of Indigency',
+    'Good Moral / Residency',
+    'Barangay Clearance For Loan',
+    'Barangay ID',
+    'Special Certification',
+    'Store Business Clearance',
+    'Tricycle Clearance',
+    'Banca Clearance'
+  ]) {
+    testWidgets('document form reveals required fields for $title',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(testApp(const ResidentDashboardScreen(
+          name: 'Synthetic resident', initialTabIndex: 1)));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Request Certificate'));
+      await tester.tap(find.text('Request Certificate'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text(title), 180,
+          scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text(title).first);
+      await tester.pumpAndSettle();
+      for (final field
+          in tester.widgetList<TextField>(find.byType(TextField))) {
+        field.controller?.clear();
+      }
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Submit Request'));
+      await tester.tap(find.text('Submit Request'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter full name.').hitTestable(), findsOneWidget);
+      final fields =
+          tester.widgetList<TextField>(find.byType(TextField)).toList();
+      expect(fields.first.focusNode!.hasFocus, isTrue);
+      expect(
+          fields.where((field) => field.decoration?.errorText != null).length,
+          greaterThanOrEqualTo(4));
+      final optionalEmail = fields.firstWhere(
+          (field) => field.keyboardType == TextInputType.emailAddress);
+      expect(optionalEmail.decoration?.errorText, isNull);
+      expect(tester.takeException(), isNull);
+      if (title == 'Certificate of Indigency') {
+        await captureUi(tester, 'document-form-field-errors');
+      }
+    });
+  }
+
   for (final scale in [1.0, 1.6]) {
     testWidgets('populated resident flows remain readable at text scale $scale',
         (tester) async {

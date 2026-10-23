@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -31,8 +32,8 @@ class RegisterVerificationScreen extends StatefulWidget {
       _RegisterVerificationScreenState();
 }
 
-class _RegisterVerificationScreenState
-    extends State<RegisterVerificationScreen> {
+class _RegisterVerificationScreenState extends State<RegisterVerificationScreen>
+    with FormFeedback<RegisterVerificationScreen> {
   static const _brandBlue = Color(0xFF006CBF);
   static const _pageBackground = Color(0xFFF8FAFC);
   static const _borderColor = Color(0xFFE6E8ED);
@@ -52,11 +53,6 @@ class _RegisterVerificationScreenState
     _idType = widget.initialIdType;
     _frontIdImage = widget.initialFrontImage;
     _backIdImage = widget.initialBackImage;
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _pickIdImage({required bool isFront}) async {
@@ -87,8 +83,10 @@ class _RegisterVerificationScreenState
                 setState(() {
                   if (isFront) {
                     _frontIdImage = capturedFile;
+                    clearFieldError('verification_Front');
                   } else {
                     _backIdImage = capturedFile;
+                    clearFieldError('verification_Back');
                   }
                 });
               },
@@ -106,8 +104,10 @@ class _RegisterVerificationScreenState
                 setState(() {
                   if (isFront) {
                     _frontIdImage = File(picked.path);
+                    clearFieldError('verification_Front');
                   } else {
                     _backIdImage = File(picked.path);
+                    clearFieldError('verification_Back');
                   }
                 });
               },
@@ -192,12 +192,13 @@ class _RegisterVerificationScreenState
   }
 
   Future<void> _completeVerification() async {
-    if (_idType == null) {
-      setState(() => _error = 'Please select your ID type.');
-      return;
-    }
-    if (_frontIdImage == null || _backIdImage == null) {
-      setState(() => _error = 'Please upload both front and back ID photos.');
+    if (!validateFields({
+      'verification_type': _idType == null ? 'Choose your ID type.' : null,
+      'verification_Front':
+          _frontIdImage == null ? 'Add the front photo of your ID.' : null,
+      'verification_Back':
+          _backIdImage == null ? 'Add the back photo of your ID.' : null,
+    })) {
       return;
     }
 
@@ -266,6 +267,7 @@ class _RegisterVerificationScreenState
     required VoidCallback onTap,
   }) {
     return Column(
+      key: fieldAnchor('verification_$label'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -276,6 +278,7 @@ class _RegisterVerificationScreenState
             fontWeight: FontWeight.w700,
           ),
         ),
+        fieldWarning('verification_$label'),
         const SizedBox(height: 8),
         InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -286,7 +289,11 @@ class _RegisterVerificationScreenState
             decoration: BoxDecoration(
               color: const Color(0xFFF4F6F8),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _borderColor, width: 1.4),
+              border: Border.all(
+                  color: fieldError('verification_$label') != null
+                      ? Theme.of(context).colorScheme.error
+                      : _borderColor,
+                  width: 1.4),
             ),
             child: image == null
                 ? const Center(
@@ -330,6 +337,8 @@ class _RegisterVerificationScreenState
   }
 
   Widget _buildIdTypeDropdown() => AppSelectionField(
+        key: fieldAnchor('verification_type'),
+        errorText: fieldError('verification_type'),
         label: 'ID Type',
         value: _idType,
         leading: const Icon(Icons.badge_outlined, color: _fieldIconColor),
@@ -340,7 +349,10 @@ class _RegisterVerificationScreenState
           'Driver License',
           'PhilSys ID'
         ],
-        onSelected: (value) => setState(() => _idType = value),
+        onSelected: (value) => setState(() {
+          _idType = value;
+          clearFieldError('verification_type');
+        }),
       );
 
   @override

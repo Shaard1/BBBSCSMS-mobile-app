@@ -1,3 +1,5 @@
+import '../../services/document_application_validation.dart';
+import '../../widgets/form_feedback.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -23,7 +25,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, FormFeedback<RegisterScreen> {
   static const _brandBlue = Color(0xFF006CBF);
   static const _pageBackground = Color(0xFFF8FAFC);
   static const _cardBackground = Colors.white;
@@ -309,6 +311,22 @@ class _RegisterScreenState extends State<RegisterScreen>
       nextErrors['confirm_password'] = 'Passwords do not match.';
     }
 
+    final dateParts = [
+      _birthDayController.text,
+      _birthMonthController.text,
+      _birthYearController.text
+    ];
+    if (dateParts.any((part) => part.trim().isNotEmpty)) {
+      final value = _buildBirthdateValue();
+      if (value == null ||
+          DocumentApplicationValidation.validate(
+                  birthdate: value, civilStatus: '') !=
+              null) {
+        nextErrors['birth_day'] = 'Enter a complete, valid date of birth.';
+        nextErrors['birth_month'] = 'Check the month.';
+        nextErrors['birth_year'] = 'Check the year.';
+      }
+    }
     setState(() {
       _fieldErrors
         ..clear()
@@ -319,7 +337,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       _triggerFieldShake(fieldKey);
     }
 
-    return nextErrors.isEmpty;
+    return validateFields(nextErrors);
   }
 
   String? _buildBirthdateValue() {
@@ -692,6 +710,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     required Widget child,
   }) {
     return Column(
+      key: fieldAnchor(fieldKey),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         child,
@@ -734,6 +753,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         child: _buildShakingField(
             fieldKey,
             AppSelectionField(
+              key: fieldAnchor(fieldKey),
               label: hint,
               value: value,
               leading: icon,
@@ -807,6 +827,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   }) {
     final hasError = _errorFor(fieldKey) != null;
     Widget input = TextField(
+      key: fieldAnchor(fieldKey),
+      focusNode: fieldFocus(fieldKey, controller),
       controller: controller,
       keyboardType: TextInputType.number,
       inputFormatters: [
@@ -1006,6 +1028,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'full_name',
                         TextField(
+                          focusNode:
+                              fieldFocus('full_name', _fullNameController),
                           controller: _fullNameController,
                           style: _fieldInputTextStyle('full_name'),
                           textInputAction: TextInputAction.next,
@@ -1111,6 +1135,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'contact',
                         TextField(
+                          focusNode: fieldFocus('contact', _contactController),
                           controller: _contactController,
                           style: _fieldInputTextStyle('contact'),
                           keyboardType: TextInputType.phone,
@@ -1186,6 +1211,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'address',
                         TextField(
+                          focusNode: fieldFocus('address', _addressController),
                           controller: _addressController,
                           style: _fieldInputTextStyle('address'),
                           textInputAction: TextInputAction.next,
@@ -1212,6 +1238,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'email',
                         TextField(
+                          focusNode: fieldFocus('email', _emailController),
                           controller: _emailController,
                           style: _fieldInputTextStyle('email'),
                           keyboardType: TextInputType.emailAddress,
@@ -1237,6 +1264,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'password',
                         TextField(
+                          focusNode:
+                              fieldFocus('password', _passwordController),
                           controller: _passwordController,
                           autocorrect: false,
                           enableSuggestions: false,
@@ -1283,6 +1312,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                       child: _buildShakingField(
                         'confirm_password',
                         TextField(
+                          focusNode: fieldFocus(
+                              'confirm_password', _confirmPasswordController),
                           controller: _confirmPasswordController,
                           autocorrect: false,
                           enableSuggestions: false,

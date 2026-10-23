@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import '../../widgets/document_office_summary.dart';
 import '../../services/document_application_validation.dart';
 import '../../widgets/document_submitted_dialog.dart';
@@ -71,7 +72,8 @@ enum _ResidentServiceView {
   certificateRequestForm,
 }
 
-class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
+class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
+    with FormFeedback<ResidentDashboardScreen> {
   static const String _verifiedShieldAsset =
       'lib/assets/Verified Resident badge.svg';
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -589,6 +591,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     ? _reportLocationKey
                     : null;
     if (missingSection != null) {
+      if (_selectedCategory != null &&
+          _descriptionController.text.trim().isEmpty) {
+        revealField('report_description');
+        return;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final sectionContext = missingSection.currentContext;
         if (!mounted || sectionContext == null) return;
@@ -2373,26 +2380,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   bool _validateCertificateRequest() {
-    final validationError = DocumentApplicationValidation.validate(
-        birthdate: _certificateControllers['date_of_birth']!.text,
-        civilStatus: _certificateControllers['civil_status']!.text);
-    if (validationError != null) {
-      _showSnackBar(validationError);
-      return false;
-    }
+    final errors = <String, String?>{};
     final requiredLabels = <String, String>{
       'full_name': 'Full Name',
       'address': 'Address',
       'contact_number': 'Contact Number',
       'purpose': 'Purpose of Request',
     };
-
-    for (final entry in requiredLabels.entries) {
-      if (_certificateControllers[entry.key]!.text.trim().isEmpty) {
-        _showSnackBar("Please enter ${entry.value}.");
-        return false;
-      }
-    }
 
     final certificateKey = _selectedCertificateRequest?['key'] as String? ?? '';
     final certificateSpecificRequired = switch (certificateKey) {
@@ -2440,14 +2434,29 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       _ => <String, String>{},
     };
 
-    for (final entry in certificateSpecificRequired.entries) {
+    for (final entry
+        in {...requiredLabels, ...certificateSpecificRequired}.entries) {
       if (_certificateControllers[entry.key]!.text.trim().isEmpty) {
-        _showSnackBar("Please enter ${entry.value}.");
-        return false;
+        errors['document_${entry.key}'] = 'Enter ${entry.value.toLowerCase()}.';
       }
     }
-
-    return true;
+    final phone = _certificateControllers['contact_number']!.text.trim();
+    if (phone.isNotEmpty && BasicAccountService.normalizePhone(phone) == null) {
+      errors['document_contact_number'] =
+          'Enter a valid Philippine mobile number.';
+    }
+    final email = _certificateControllers['email']!.text.trim();
+    if (email.isNotEmpty &&
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      errors['document_email'] = 'Enter a valid email address.';
+    }
+    errors['document_date_of_birth'] = DocumentApplicationValidation.validate(
+        birthdate: _certificateControllers['date_of_birth']!.text,
+        civilStatus: '');
+    errors['document_civil_status'] = DocumentApplicationValidation.validate(
+        birthdate: '',
+        civilStatus: _certificateControllers['civil_status']!.text);
+    return validateFields(errors);
   }
 
   Map<String, dynamic> _buildCertificateRequestPayload(
@@ -3793,20 +3802,25 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                                 const SizedBox(height: 20),
                                 _reportFieldLabel('What happened?'),
                                 TextField(
+                                    key: fieldAnchor('report_description'),
+                                    focusNode:
+                                        fieldFocus('report_description',
+                                            _descriptionController),
                                     controller: _descriptionController,
                                     minLines: 4,
                                     maxLines: 8,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
+                                    textCapitalization: TextCapitalization
+                                        .sentences,
                                     onChanged: (_) {
                                       if (_reportValidationRequested) {
                                         setState(() {});
                                       }
                                     },
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Color(0xFF334155),
-                                        height: 1.5),
+                                    style:
+                                        const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF334155),
+                                            height: 1.5),
                                     decoration: InputDecoration(
                                         hintText:
                                             'Describe the issue, when it started, and a nearby landmark.',
@@ -4403,169 +4417,172 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           },
         ),
         Expanded(
-          child: ListView(
+          child: SingleChildScrollView(
             key: const PageStorageKey('certificate-form'),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE9EDF2)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0A101828),
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE9EDF2)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0A101828),
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: background,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: accent, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Color(0xFF2A2F35),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: background,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            style: const TextStyle(
-                              color: Color(0xFF667085),
-                              fontSize: 12.5,
-                              height: 1.3,
-                            ),
+                          child: Icon(icon, color: accent, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Color(0xFF2A2F35),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                description,
+                                style: const TextStyle(
+                                  color: Color(0xFF667085),
+                                  fontSize: 12.5,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                fee,
+                                style: const TextStyle(
+                                  color: Color(0xFF2A2F35),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            fee,
-                            style: const TextStyle(
-                              color: Color(0xFF2A2F35),
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              _buildReportSectionTitle("Personal Information"),
-              const SizedBox(height: 10),
-              _buildCertificateTextField(
-                fieldKey: 'full_name',
-                label: 'Name on the requested document',
-                hint: 'Full name of the person the document is for',
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'address',
-                label: 'Applicant residential address',
-                hint: 'Address of the person the document is for',
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'contact_number',
-                label: 'Contact Number',
-                hint: 'Enter your contact number',
-                keyboardType: TextInputType.phone,
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'email',
-                label: 'Email Address',
-                hint: 'Enter your email address',
-                keyboardType: TextInputType.emailAddress,
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'date_of_birth',
-                label: 'Date of Birth',
-                hint: 'MM/DD/YYYY',
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'civil_status',
-                label: 'Civil Status',
-                hint: 'Enter your civil status',
-              ),
-              const SizedBox(height: 8),
-              _buildReportSectionTitle("Request Details"),
-              const SizedBox(height: 10),
-              ..._buildCertificateSpecificFields(
-                certificate['key'] as String? ?? '',
-              ),
-              _buildCertificateTextField(
-                fieldKey: 'purpose',
-                label: 'Purpose of Request',
-                hint: 'State the purpose of your request',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 8),
-              _buildReportSectionTitle("Payment and collection"),
-              const SizedBox(height: 10),
-              const Text(
-                  "No online payment. Staff will confirm applicable fees. Pay and collect your document at the barangay office after the required checks."),
-              const SizedBox(height: 16),
-              _buildReportSectionTitle("Additional Notes"),
-              const SizedBox(height: 10),
-              _buildCertificateTextField(
-                fieldKey: 'additional_notes',
-                label: 'Additional Notes',
-                hint: 'Add supporting notes if needed',
-                maxLines: 4,
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isSubmittingCertificateRequest
-                      ? null
-                      : _submitCertificateRequestForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _brandBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(
-                    _isSubmittingCertificateRequest
-                        ? "Submitting..."
-                        : "Submit Request",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(height: 18),
+                  _buildReportSectionTitle("Personal Information"),
+                  const SizedBox(height: 10),
+                  _buildCertificateTextField(
+                    fieldKey: 'full_name',
+                    label: 'Name on the requested document',
+                    hint: 'Full name of the person the document is for',
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'address',
+                    label: 'Applicant residential address',
+                    hint: 'Address of the person the document is for',
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'contact_number',
+                    label: 'Contact Number',
+                    hint: 'Enter your contact number',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'email',
+                    label: 'Email Address',
+                    hint: 'Enter your email address',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'date_of_birth',
+                    label: 'Date of Birth',
+                    hint: 'MM/DD/YYYY',
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'civil_status',
+                    label: 'Civil Status',
+                    hint: 'Enter your civil status',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildReportSectionTitle("Request Details"),
+                  const SizedBox(height: 10),
+                  ..._buildCertificateSpecificFields(
+                    certificate['key'] as String? ?? '',
+                  ),
+                  _buildCertificateTextField(
+                    fieldKey: 'purpose',
+                    label: 'Purpose of Request',
+                    hint: 'State the purpose of your request',
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildReportSectionTitle("Payment and collection"),
+                  const SizedBox(height: 10),
+                  const Text(
+                      "No online payment. Staff will confirm applicable fees. Pay and collect your document at the barangay office after the required checks."),
+                  const SizedBox(height: 16),
+                  _buildReportSectionTitle("Additional Notes"),
+                  const SizedBox(height: 10),
+                  _buildCertificateTextField(
+                    fieldKey: 'additional_notes',
+                    label: 'Additional Notes',
+                    hint: 'Add supporting notes if needed',
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isSubmittingCertificateRequest
+                          ? null
+                          : _submitCertificateRequestForm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _brandBlue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        _isSubmittingCertificateRequest
+                            ? "Submitting..."
+                            : "Submit Request",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "This is a draft request form and may still be updated once the barangay confirms the final required fields for each certificate.",
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 12,
-                  height: 1.4,
-                ),
-              ),
-            ],
+                  const SizedBox(height: 12),
+                  const Text(
+                    "This is a draft request form and may still be updated once the barangay confirms the final required fields for each certificate.",
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ]),
           ),
         ),
       ],
@@ -4746,20 +4763,26 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           .where((v) => v.toLowerCase() == controller.text.trim().toLowerCase())
           .firstOrNull;
       return Padding(
+          key: fieldAnchor('document_$fieldKey'),
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
               key: ValueKey('civil-status-${controller.text}'),
               initialValue: match,
               isExpanded: true,
-              decoration: InputDecoration(labelText: label),
+              decoration: decorateField(
+                  'document_$fieldKey', InputDecoration(labelText: label)),
               items: DocumentApplicationValidation.civilStatuses
                   .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                   .toList(),
               onChanged: (value) {
-                if (value != null) setState(() => controller.text = value);
+                if (value != null) {
+                  setState(() => controller.text = value);
+                  clearFieldError('document_$fieldKey');
+                }
               }));
     }
     return Padding(
+      key: fieldAnchor('document_$fieldKey'),
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4774,6 +4797,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            focusNode: fieldFocus(
+                'document_$fieldKey', _certificateControllers[fieldKey]!),
             controller: _certificateControllers[fieldKey],
             readOnly: fieldKey == 'date_of_birth',
             onTap: fieldKey == 'date_of_birth'
@@ -4800,6 +4825,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             keyboardType: keyboardType,
             maxLines: maxLines,
             decoration: InputDecoration(
+              errorText: fieldError('document_$fieldKey'),
+              errorMaxLines: 3,
               hintText: hint,
               hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
               filled: true,

@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/basic_account_service.dart';
@@ -11,7 +12,8 @@ class PrivacySecurityScreen extends StatefulWidget {
   State<PrivacySecurityScreen> createState() => _PrivacySecurityScreenState();
 }
 
-class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
+class _PrivacySecurityScreenState extends State<PrivacySecurityScreen>
+    with FormFeedback<PrivacySecurityScreen> {
   static const Color _brandBlue = Color(0xFF0B4F94);
   static const Color _pageBackground = Color(0xFFF8FAFC);
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -124,14 +126,14 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    final passwordError = BasicAccountService.validatePassword(newPassword);
-    if (passwordError != null) {
-      _showSnackBar(passwordError);
-      return;
-    }
-
-    if (newPassword != confirmPassword) {
-      _showSnackBar("Passwords do not match.");
+    if (!validateFields({
+      'new_password': BasicAccountService.validatePassword(newPassword),
+      'confirm_password': confirmPassword.isEmpty
+          ? 'Confirm your new password.'
+          : newPassword != confirmPassword
+              ? 'Passwords do not match.'
+              : null,
+    })) {
       return;
     }
 
@@ -394,55 +396,66 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                         ),
                         const SizedBox(height: 14),
                         TextField(
+                          key: fieldAnchor('new_password'),
+                          focusNode: fieldFocus(
+                              'new_password', _newPasswordController),
                           controller: _newPasswordController,
                           autocorrect: false,
                           enableSuggestions: false,
                           textInputAction: TextInputAction.next,
                           obscureText: !_showNewPassword,
-                          decoration: _fieldDecoration(
-                            label: "New password",
-                            suffixIcon: IconButton(
-                              tooltip: _showNewPassword
-                                  ? 'Hide password'
-                                  : 'Show password',
-                              onPressed: () {
-                                setState(() {
-                                  _showNewPassword = !_showNewPassword;
-                                });
-                              },
-                              icon: Icon(
-                                _showNewPassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                            ),
-                          ),
+                          decoration: decorateField(
+                              'new_password',
+                              _fieldDecoration(
+                                label: "New password",
+                                suffixIcon: IconButton(
+                                  tooltip: _showNewPassword
+                                      ? 'Hide password'
+                                      : 'Show password',
+                                  onPressed: () {
+                                    setState(() {
+                                      _showNewPassword = !_showNewPassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _showNewPassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                ),
+                              )),
                         ),
                         const SizedBox(height: 12),
                         TextField(
+                          key: fieldAnchor('confirm_password'),
+                          focusNode: fieldFocus(
+                              'confirm_password', _confirmPasswordController),
                           controller: _confirmPasswordController,
                           autocorrect: false,
                           enableSuggestions: false,
                           textInputAction: TextInputAction.done,
                           obscureText: !_showConfirmPassword,
-                          decoration: _fieldDecoration(
-                            label: "Confirm new password",
-                            suffixIcon: IconButton(
-                              tooltip: _showConfirmPassword
-                                  ? 'Hide password confirmation'
-                                  : 'Show password confirmation',
-                              onPressed: () {
-                                setState(() {
-                                  _showConfirmPassword = !_showConfirmPassword;
-                                });
-                              },
-                              icon: Icon(
-                                _showConfirmPassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                            ),
-                          ),
+                          decoration: decorateField(
+                              'confirm_password',
+                              _fieldDecoration(
+                                label: "Confirm new password",
+                                suffixIcon: IconButton(
+                                  tooltip: _showConfirmPassword
+                                      ? 'Hide password confirmation'
+                                      : 'Show password confirmation',
+                                  onPressed: () {
+                                    setState(() {
+                                      _showConfirmPassword =
+                                          !_showConfirmPassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _showConfirmPassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                ),
+                              )),
                         ),
                         const SizedBox(height: 14),
                         SizedBox(

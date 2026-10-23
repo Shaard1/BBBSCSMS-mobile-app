@@ -1,3 +1,4 @@
+import '../../widgets/form_feedback.dart';
 import 'dart:typed_data';
 import '../../core/app_interactions.dart';
 
@@ -13,7 +14,8 @@ class DocumentEvidenceScreen extends StatefulWidget {
   State<DocumentEvidenceScreen> createState() => _DocumentEvidenceScreenState();
 }
 
-class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
+class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen>
+    with FormFeedback<DocumentEvidenceScreen> {
   final _idType = TextEditingController();
   final _methods = <String, String>{
     'identity': 'in_person',
@@ -50,6 +52,7 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
       if (!mounted) return;
       setState(() {
         _files[kind] = file;
+        clearFieldError(kind);
         _previews[kind] = bytes;
         _fileErrors.remove(kind);
         _error = null;
@@ -69,13 +72,16 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
       'residency',
       if (_capacity == 'representative') 'authorization'
     ];
-    if (requiredKinds.any(
-            (kind) => _methods[kind] == 'upload' && _files[kind] == null) ||
-        (_methods['identity'] == 'upload' && _idType.text.trim().isEmpty)) {
-      setState(() => _error =
-          'Choose the required image and identify the uploaded ID, or choose to present originals at the office.');
-      return;
-    }
+    final errors = <String, String?>{
+      for (final kind in requiredKinds)
+        kind: _methods[kind] == 'upload' && _files[kind] == null
+            ? 'Choose a photo, or select “Bring originals to the office”.'
+            : null,
+      'id_type': _methods['identity'] == 'upload' && _idType.text.trim().isEmpty
+          ? 'Enter the name or type of the uploaded document.'
+          : null,
+    };
+    if (!validateFields(errors)) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -163,16 +169,21 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: const Color(0xFFD8E3EF)),
+          border: Border.all(
+              color: fieldError(kind) != null
+                  ? Theme.of(context).colorScheme.error
+                  : const Color(0xFFD8E3EF)),
           borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label,
+            key: fieldAnchor(kind),
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Text(help),
+        fieldWarning(kind),
         const SizedBox(height: 8),
         _choices(
             kind,
@@ -183,6 +194,10 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
             },
             (value) => setState(() {
                   _methods[kind] = value;
+                  clearFieldError(kind);
+                  if (kind == 'identity' && value == 'in_person') {
+                    clearFieldError('id_type');
+                  }
                   _error = null;
                 })),
         if (_methods[kind] == 'upload') ...[
@@ -246,11 +261,15 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
             const Text('What document are you uploading?'),
             const SizedBox(height: 8),
             TextField(
+                key: fieldAnchor('id_type'),
+                focusNode: fieldFocus('id_type', _idType),
                 controller: _idType,
                 enabled: !_busy,
                 textCapitalization: TextCapitalization.sentences,
                 maxLength: 120,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
+                    errorText: fieldError('id_type'),
+                    errorMaxLines: 3,
                     labelText: 'Document name',
                     hintText: 'Enter the document name',
                     counterText: '')),
@@ -299,52 +318,54 @@ class _DocumentEvidenceScreenState extends State<DocumentEvidenceScreen> {
                         ])))),
         body: SafeArea(
             bottom: false,
-            child: ListView(
+            child: SingleChildScrollView(
                 key: const ValueKey('requirements-list'),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                children: [
-                  Text('Prepare your documents',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  const Text(
-                      'Choose how you’ll provide your documents. Barangay staff will review them before release.'),
-                  const SizedBox(height: 12),
-                  const Text(
-                      'Uploads remain private. Staff may still ask to inspect originals at the office. Uploading does not automatically verify your identity or approve release.'),
-                  const SizedBox(height: 24),
-                  Text('Who are you applying for?',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  _choices(
-                      'capacity',
-                      _capacity,
-                      const {
-                        'self': 'Myself',
-                        'representative': 'Someone else'
-                      },
-                      (value) => setState(() {
-                            _capacity = value;
-                            _error = null;
-                          })),
-                  _section('identity', 'Proof of identity',
-                      'Provide the applicant’s ID, or ask the barangay office about alternative documents.'),
-                  _section('residency', 'Proof of address',
-                      'Staff will check the applicant’s address against barangay records or accepted documents. Ask which documents your service requires.'),
-                  if (_capacity == 'representative')
-                    _section(
-                        'authorization',
-                        'Permission to apply for someone else',
-                        'Provide the person’s authorization and supporting documents. Being a family member does not automatically give permission.'),
-                  const SizedBox(height: 20),
-                  const Text(
-                      'Payment and collection happen at the barangay office. Staff will confirm any applicable fees. There is no online payment.'),
-                ])),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Prepare your documents',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'Choose how you’ll provide your documents. Barangay staff will review them before release.'),
+                      const SizedBox(height: 12),
+                      const Text(
+                          'Uploads remain private. Staff may still ask to inspect originals at the office. Uploading does not automatically verify your identity or approve release.'),
+                      const SizedBox(height: 24),
+                      Text('Who are you applying for?',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      _choices(
+                          'capacity',
+                          _capacity,
+                          const {
+                            'self': 'Myself',
+                            'representative': 'Someone else'
+                          },
+                          (value) => setState(() {
+                                _capacity = value;
+                                _error = null;
+                              })),
+                      _section('identity', 'Proof of identity',
+                          'Provide the applicant’s ID, or ask the barangay office about alternative documents.'),
+                      _section('residency', 'Proof of address',
+                          'Staff will check the applicant’s address against barangay records or accepted documents. Ask which documents your service requires.'),
+                      if (_capacity == 'representative')
+                        _section(
+                            'authorization',
+                            'Permission to apply for someone else',
+                            'Provide the person’s authorization and supporting documents. Being a family member does not automatically give permission.'),
+                      const SizedBox(height: 20),
+                      const Text(
+                          'Payment and collection happen at the barangay office. Staff will confirm any applicable fees. There is no online payment.'),
+                    ]))),
       );
 }
