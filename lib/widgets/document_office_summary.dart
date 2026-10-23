@@ -114,8 +114,9 @@ class DocumentOfficeSummary extends StatelessWidget {
           'Your request was rejected. Contact the barangay office if you need help understanding the reason.',
         'completed' =>
           'Your request is marked completed. You can view the recorded collection details below.',
-        'ready_for_release' =>
-          'Your document is ready. Contact the barangay office for collection instructions.',
+        'ready_for_release' => value('reopened_at').isNotEmpty
+            ? 'The barangay office corrected the previous completion. Your document is ready for collection. Contact the office for collection instructions.'
+            : 'Your document is ready. Contact the barangay office for collection instructions.',
         'processing' =>
           'Barangay staff are processing your request. Check Activity for updates.',
         _ => 'Your request is waiting for barangay review.',

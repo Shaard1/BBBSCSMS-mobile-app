@@ -6,6 +6,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_interactions_test.dart' show testApp, captureUi, loadAppTestFonts;
 
 void main() {
+  test('reopening explains the correction only while ready for collection', () {
+    const reopened = {
+      'status': 'ready_for_release',
+      'reopened_at': '2026-10-23T12:00:00Z'
+    };
+    expect(const DocumentOfficeSummary(request: reopened).nextStep,
+        contains('corrected the previous completion'));
+    expect(
+        const DocumentOfficeSummary(request: {
+          'status': 'completed',
+          'reopened_at': '2026-10-23T12:00:00Z'
+        }).nextStep,
+        isNot(contains('ready for collection')));
+    expect(
+        const DocumentOfficeSummary(request: {'status': 'ready_for_release'})
+            .nextStep,
+        isNot(contains('corrected')));
+  });
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
     await loadAppTestFonts();
