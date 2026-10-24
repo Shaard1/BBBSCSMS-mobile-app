@@ -3007,7 +3007,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                           ])),
                       if (MediaQuery.textScalerOf(context).scale(1) <= 1.3) ...[
                         const SizedBox(width: 12),
-                        SvgPicture.asset('lib/assets/bancao-connect-mark.svg',
+                        SvgPicture.asset('lib/assets/bancao-connect-mark-white.svg',
                             width: 52, height: 52),
                       ],
                     ])),
