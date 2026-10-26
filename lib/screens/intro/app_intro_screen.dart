@@ -5,13 +5,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_interactions.dart';
 import '../../widgets/app_launch_view.dart';
+import '../../widgets/brand_startup_animation.dart';
 import '../auth/login_screen.dart';
 import '../home_screen.dart';
 
 class AppIntroScreen extends StatefulWidget {
-  const AppIntroScreen({super.key, this.initialize});
+  const AppIntroScreen({super.key, this.initialize, this.firstFrameReady});
 
   final Future<void> Function()? initialize;
+  final Future<void>? firstFrameReady;
 
   @override
   State<AppIntroScreen> createState() => _AppIntroScreenState();
@@ -19,18 +21,19 @@ class AppIntroScreen extends StatefulWidget {
 
 class _AppIntroScreenState extends State<AppIntroScreen> {
   bool _hasError = false;
-  Timer? _presentationTimer;
+  int _attempt = 0;
+  Completer<void> _presentation = Completer<void>();
 
   @override
   void dispose() {
-    _presentationTimer?.cancel();
+    _finishPresentation();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-    // Start presentation timing once the branded frame is visible.
+    // Initialization and the one-shot brand animation share the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
@@ -38,13 +41,10 @@ class _AppIntroScreenState extends State<AppIntroScreen> {
     if (!mounted) return;
     setState(() => _hasError = false);
     try {
-      final presentation = Completer<void>();
-      _presentationTimer =
-          Timer(const Duration(seconds: 2), presentation.complete);
       await Future.wait<void>([
         if (widget.initialize != null) widget.initialize!(),
-        presentation.future,
-      ]);
+        _presentation.future,
+      ], eagerError: true);
       if (!mounted) return;
       final hasSession = Supabase.instance.client.auth.currentUser != null;
       Navigator.of(context).pushReplacement(PageRouteBuilder<void>(
@@ -60,11 +60,27 @@ class _AppIntroScreenState extends State<AppIntroScreen> {
     }
   }
 
+  void _finishPresentation() {
+    if (!_presentation.isCompleted) _presentation.complete();
+  }
+
+  void _retry() {
+    _finishPresentation();
+    _presentation = Completer<void>();
+    _attempt++;
+    _start();
+  }
+
   @override
-  Widget build(BuildContext context) => AppLaunchView(
-        errorMessage: _hasError
-            ? 'We couldn’t start the app. Please check your connection and try again.'
-            : null,
-        onRetry: _hasError ? _start : null,
-      );
+  Widget build(BuildContext context) => _hasError
+      ? AppLaunchView(
+          errorMessage:
+              'We couldn’t start the app. Please check your connection and try again.',
+          onRetry: _retry,
+        )
+      : BrandStartupAnimation(
+          key: ValueKey(_attempt),
+          onCompleted: _finishPresentation,
+          firstFrameReady: widget.firstFrameReady,
+        );
 }

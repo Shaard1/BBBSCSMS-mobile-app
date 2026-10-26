@@ -44,6 +44,10 @@ flutter:
     - lib/assets/menu_icons/
 
   fonts:
+    - family: PublicSansBrand
+      fonts:
+        - asset: assets/fonts/PublicSans-Black.ttf
+          weight: 900
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf

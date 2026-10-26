@@ -21,9 +21,10 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.initialize});
+  const MyApp({super.key, this.initialize, this.firstFrameReady});
 
   final Future<void> Function()? initialize;
+  final Future<void>? firstFrameReady;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +46,8 @@ class MyApp extends StatelessWidget {
       initialRoute: '/intro',
 
       routes: {
-        '/intro': (context) => AppIntroScreen(initialize: initialize),
+        '/intro': (context) => AppIntroScreen(
+            initialize: initialize, firstFrameReady: firstFrameReady),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => BasicAccountService.previewEnabled
             ? const BasicRegisterScreen()

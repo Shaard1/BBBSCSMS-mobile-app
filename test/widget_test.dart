@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:capstone_app/screens/auth/login_screen.dart';
 import 'package:capstone_app/screens/auth/register_screen.dart';
 import 'package:capstone_app/widgets/app_launch_view.dart';
+import 'package:capstone_app/widgets/brand_startup_animation.dart';
 import 'package:capstone_app/screens/residents/resident_dashboard_screen.dart';
 import 'app_interactions_test.dart' show testApp, captureUi, loadAppTestFonts;
 
@@ -60,7 +61,7 @@ void main() {
   tearDownAll(() => mapCache.destroy(deleteCache: true));
 
   testWidgets('mobile app builds its MaterialApp shell', (tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(firstFrameReady: Future<void>.value()));
 
     expect(find.byType(MaterialApp), findsOneWidget);
   });
@@ -68,8 +69,10 @@ void main() {
   testWidgets('startup waits for initialization and the logo presentation',
       (tester) async {
     final initialization = Completer<void>();
-    await tester.pumpWidget(MyApp(initialize: () => initialization.future));
-    expect(find.text('BancaoConnect'), findsOneWidget);
+    await tester.pumpWidget(MyApp(
+        firstFrameReady: Future<void>.value(),
+        initialize: () => initialization.future));
+    expect(find.byType(BrandStartupAnimation), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
     expect(find.byType(LoginScreen), findsNothing);
     initialization.complete();
@@ -84,10 +87,12 @@ void main() {
   testWidgets('startup failure has a retry without exposing technical errors',
       (tester) async {
     var attempts = 0;
-    await tester.pumpWidget(MyApp(initialize: () async {
-      attempts++;
-      if (attempts == 1) throw StateError('internal connection detail');
-    }));
+    await tester.pumpWidget(MyApp(
+        firstFrameReady: Future<void>.value(),
+        initialize: () async {
+          attempts++;
+          if (attempts == 1) throw StateError('internal connection detail');
+        }));
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.textContaining('internal connection detail'), findsNothing);
